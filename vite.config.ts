@@ -52,6 +52,17 @@ export default defineConfig(async ({ command }) => {
   const { cloudflare } = await import("@cloudflare/vite-plugin");
 
   return {
+    environments: {
+      client: {
+        build: {
+          rolldownOptions: {
+            // Keep the navigation module's namespace intact when Link imports
+            // it lazily; merging it into the entry drops its runtime exports.
+            preserveEntrySignatures: "strict" as const,
+          },
+        },
+      },
+    },
     server: {
       ...(managedLinux
         ? { host: "0.0.0.0", allowedHosts: ["terminal.local"] }

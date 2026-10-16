@@ -24,6 +24,8 @@ node scripts/verify-auth.mjs
 
 저장한 실제 GitHub Trending HTML을 추가로 검증하려면 `node scripts/verify-repositories.mjs /absolute/path/trending.html`을 실행합니다. 이 스크립트의 기본 검사는 네트워크 없이 실행됩니다.
 
+화면 이동 변경은 `npm run build` 후 `npm start`의 프로덕션 서버에서도 검증합니다. 트렌딩 → 내 프로젝트 → 분석 기록 → 프로젝트 열기와 브라우저 뒤로 가기를 확인하고, 개선 목표와 현재 탭의 검토 기록이 유지되는지 확인합니다. `vite.config.ts`의 클라이언트 `preserveEntrySignatures: "strict"`는 Vinext의 지연 로드 라우터가 필요한 내보내기를 유지하도록 합니다. 이 설정이 없으면 빌드는 성공해도 배포 브라우저의 링크 클릭과 RSC 프리페치가 함수 누락 오류로 실패할 수 있습니다.
+
 ## 화면
 
 - `/`: 실제 GitHub Trending Today. 원본 목록 순서를 순위로 사용합니다. 검색·언어 필터는 원래의 전체 언어 순위를 유지합니다. 수집 시각, 5분 캐시와 오래된 자료 상태를 표시합니다. 실패하면 가짜 순위로 대체하지 않습니다.
