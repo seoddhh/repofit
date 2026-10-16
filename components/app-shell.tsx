@@ -1,16 +1,17 @@
 'use client';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { Compass, FolderGit2, Clock3, ArrowUpRight, ChevronDown, LogIn, LogOut, X, GitBranch } from 'lucide-react';
+import { Compass, FolderGit2, Clock3, ArrowUpRight, ChevronDown, LogIn, LogOut, X, GitBranch, Bot } from 'lucide-react';
 import { DemoProvider, useDemo } from './demo-provider';
 import { WorkspaceProvider, useWorkspace } from './workspace-provider';
+import { AgentProvider } from './agent-provider';
 import { GithubIcon } from './github-icon';
 import type { ChatGPTUser } from '@/app/chatgpt-auth';
 import { chatGPTSignInPath, chatGPTSignOutPath } from '@/lib/chatgpt-auth-paths';
 
 type ShellProps = { children: React.ReactNode; user: ChatGPTUser | null; localPreview: boolean };
 export function AppShell({ children, user, localPreview }: ShellProps) {
-  return <WorkspaceProvider><DemoProvider><Shell user={user} localPreview={localPreview}>{children}</Shell></DemoProvider></WorkspaceProvider>;
+  return <WorkspaceProvider><DemoProvider><AgentProvider><Shell user={user} localPreview={localPreview}>{children}</Shell></AgentProvider></DemoProvider></WorkspaceProvider>;
 }
 function Shell({ children, user, localPreview }: ShellProps) {
   const pathname = usePathname();
@@ -22,6 +23,7 @@ function Shell({ children, user, localPreview }: ShellProps) {
   const navigation = [
     { href: '/', title: '트렌딩', icon: Compass, active: pathname === '/' },
     { href: '/project', title: '내 프로젝트', icon: FolderGit2, active: pathname === '/project' },
+    { href: '/agent', title: '내 에이전트', icon: Bot, active: pathname === '/agent' },
     { href: '/history', title: '분석 기록', icon: Clock3, active: pathname === '/history' || pathname.startsWith('/analysis') },
   ];
   return <div className="app-shell">

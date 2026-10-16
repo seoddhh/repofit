@@ -1,0 +1,58 @@
+import assert from 'node:assert/strict';
+import { readFileSync, mkdtempSync, writeFileSync, symlinkSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { createRequire } from 'node:module';
+import ts from 'typescript';
+
+const temporary = mkdtempSync(join(tmpdir(), 'repofit-agent-'));
+try {
+  writeFileSync(join(temporary, 'package.json'), '{"type":"commonjs"}');
+  symlinkSync(resolve('node_modules'), join(temporary, 'node_modules'));
+  for (const name of ['repository-types', 'agent-review', 'agent-tools']) {
+    writeFileSync(join(temporary, `${name}.js`), ts.transpileModule(readFileSync(`lib/${name}.ts`, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText);
+  }
+  const require = createRequire(import.meta.url);
+  const { createAgentTask, reviseAgentTask, reviewResultSchema, resultMarkdown, taskPrompt } = require(join(temporary, 'agent-review.js'));
+  const { createAgentTools } = require(join(temporary, 'agent-tools.js'));
+  const input = { project: { kind: 'github', repository: 'https://github.com/owner/app' }, candidate: 'owner/tool', goal: '테스트 설정 단순화' };
+  const created = createAgentTask(input);
+  assert.equal(created.project.repository, 'owner/app');
+  assert.equal(created.status, 'queued');
+  for (const candidate of ['javascript:alert(1)', 'https://evil.example/owner/repo', 'owner/../etc', 'owner/app']) assert.throws(() => createAgentTask({ ...input, candidate }));
+  assert.throws(() => createAgentTask({ ...input, goal: ' ' }));
+  assert.throws(() => createAgentTask({ ...input, autoExecute: true }));
+  const local = createAgentTask({ ...input, project: { kind: 'local', label: '현재 열린 앱' } });
+  assert.equal(local.project.label, '현재 열린 앱');
+  const report = { agent: '연동 테스트', verdict: 'hold', summary: '검증용 결과', reasons: ['실제 검토 전'], benefits: [], risks: [], changes: [], evidence: [{ label: '공식 레포', url: 'https://github.com/owner/tool' }], validation: [{ check: '호환성', status: 'not_run', detail: '실행하지 않음' }], limitations: ['검증용 자료'] };
+  for (const url of ['javascript:alert(1)', 'http://example.com', 'https://token@example.com']) assert.throws(() => reviewResultSchema.parse({ ...report, evidence: [{ label: 'unsafe', url }] }));
+  assert.throws(() => reviewResultSchema.parse({ ...report, reasons: [] }));
+  assert.throws(() => reviewResultSchema.parse({ ...report, limitations: [] }));
+  assert.throws(() => reviseAgentTask(created, 0, { status: 'completed', result: report }));
+  let current = created;
+  let writes = 0;
+  const lookup = id => { if (id !== current.id) throw new Error('알 수 없는 요청'); return current; };
+  const update = (id, rev, change) => { const next = reviseAgentTask(lookup(id), rev, change); current = next; writes += 1; return next; };
+  const tools = createAgentTools({ context: () => ({ selectedTaskId: current.id }), task: lookup, progress: value => update(value.taskId, value.expectedRevision, { status: value.status, message: value.message }), submit: value => update(value.taskId, value.expectedRevision, { status: 'completed', result: value.result }) });
+  const call = (name, args) => tools.find(tool => tool.name === name).execute(args);
+  assert.equal(call('repofit_get_context', {}).data.selectedTaskId, current.id);
+  assert.equal(call('repofit_get_context', { extra: 'unexpected' }).ok, false);
+  assert.equal(call('repofit_get_task', { taskId: current.id }).data.revision, 0);
+  assert.equal(writes, 0, 'reading a request cannot start the agent');
+  assert.equal(call('repofit_update_progress', { taskId: current.id, expectedRevision: 0, status: 'running', message: '자료 확인 중' }).data.revision, 1);
+  assert.equal(call('repofit_update_progress', { taskId: current.id, expectedRevision: 0, status: 'running', message: '오래된 작업' }).ok, false);
+  assert.equal(writes, 1, 'stale progress must not overwrite new progress');
+  assert.equal(call('repofit_submit_review', { taskId: current.id, expectedRevision: 1, result: { ...report, validation: [{ check: 'test', status: 'verified', detail: 'unsupported status' }] } }).ok, false);
+  assert.equal(current.status, 'running');
+  assert.equal(call('repofit_submit_review', { taskId: current.id, expectedRevision: 1, result: report }).data.status, 'completed');
+  assert.equal(call('repofit_submit_review', { taskId: current.id, expectedRevision: 2, result: report }).ok, false);
+  assert.match(resultMarkdown(current), /not_run/);
+  assert.ok(taskPrompt(current, 'https://repofit.example').includes(current.id));
+  current = reviseAgentTask(local, 0, { status: 'canceled', message: '사용자 취소' });
+  assert.equal(call('repofit_update_progress', { taskId: current.id, expectedRevision: 1, status: 'running', message: '취소 후 업데이트' }).ok, false);
+  assert.equal(call('repofit_submit_review', { taskId: current.id, expectedRevision: 1, result: report }).ok, false);
+  current = createAgentTask(input);
+  assert.equal(call('repofit_update_progress', { taskId: current.id, expectedRevision: 0, status: 'failed', message: '권한 없음' }).data.status, 'failed');
+  assert.equal(call('repofit_get_task', { taskId: crypto.randomUUID() }).ok, false);
+  console.log('통과: URL·결과 검증, 읽기 전용 조회, 대기→시작→결과, revision 충돌, 취소·실패·완료 후 쓰기 거부, 수동 전달 형식');
+} finally { rmSync(temporary, { recursive: true, force: true }); }

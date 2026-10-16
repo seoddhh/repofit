@@ -20,6 +20,7 @@ npm run typecheck
 npm run build
 node scripts/verify-repositories.mjs
 node scripts/verify-auth.mjs
+node scripts/verify-agent.mjs
 ```
 
 저장한 실제 GitHub Trending HTML을 추가로 검증하려면 `node scripts/verify-repositories.mjs /absolute/path/trending.html`을 실행합니다. 이 스크립트의 기본 검사는 네트워크 없이 실행됩니다.
@@ -33,6 +34,7 @@ node scripts/verify-auth.mjs
 - `/history`: 현재 탭의 적용 검토 기록을 다시 열거나 삭제합니다. 이전 localStorage 데모 기록이 있는 경우 별도 접힌 영역에서 보존합니다.
 - `/analysis/[runId]`: 기존 UI 데모 보고서. 실제 데이터와 혼동하지 않도록 예시임을 표시합니다.
 - `/account`: ChatGPT 계정 상태, 정보 사용 안내, 로그인·로그아웃. 로컬 테스트 인증과 배포된 Sites의 실제 인증을 구분합니다.
+- `/agent`: GitHub 또는 사용자 에이전트에서 열린 프로젝트에 대한 검토 요청, 스킬 다운로드, 실행 요청 전달, 진행 상태와 구조화된 결과. 사이트의 GitHub API 사전 조회 없이 요청을 만들 수 있습니다.
 - `/api/session`: Sites가 전달한 현재 방문자 인증 상태. `private, no-store`이며 AI 플랜 사용 권한과 별도로 응답합니다.
 
 ## 실제 조회 경계
@@ -44,6 +46,23 @@ README는 최대 64KB, 파일 경로는 최대 500개를 표시합니다. 루트
 `lib/integration-plan.ts`는 확인한 경로와 루트 의존성에 기반한 초기 검토를 만듭니다. 후보의 루트 package.json 이름은 모노레포의 배포 패키지 이름과 다를 수 있습니다. 따라서 설치 명령, 확정적인 적합도나 버전 호환성은 생성하지 않습니다. 개선 목표는 검토 맥락으로 보관하며 모델로 의미 분석하지 않습니다.
 
 프로젝트와 검토 결과는 React context의 현재 탭 메모리에 보관되며 새로고침하면 사라집니다. 적용 계획은 Markdown으로 다운로드할 수 있습니다. Sites 로그인은 연결했으며 추론 권한·사용자별 D1 기록은 후속 범위입니다. `.openai/hosting.json`의 저장소 binding은 미설정입니다. 배포와 사용자 플랜의 지원 경계는 `DEPLOYMENT.md`를 참고하세요.
+
+## 사용자 에이전트 검토
+
+`public/skills/repofit-review/SKILL.md`는 사용자가 설치할 검토 워크플로입니다. `lib/agent-review.ts`가 요청·결과 계약과 상태 전이를, `lib/agent-tools.ts`가 페이지 도구를 정의합니다. `AgentProvider`는 앱 셸에서 도구를 등록하고 계정 변경·페이지 종료 시 등록을 해제합니다. 지원하지 않는 브라우저에서도 요청 텍스트 다운로드와 결과 JSON 가져오기를 사용할 수 있습니다.
+
+| 페이지 도구 | 동작 |
+| --- | --- |
+| `repofit_get_context` | 현재 선택한 요청 ID와 이 탭의 요청 목록 조회 |
+| `repofit_get_task` | 고정된 대상·후보·목표, 현재 상태와 revision 조회 |
+| `repofit_update_progress` | 실제 검토 시작·진행 또는 실패 보고 |
+| `repofit_submit_review` | 판단·근거·변경 제안·검증 보고·한계를 결과 패널에 표시 |
+
+요청 생성은 `queued`이며 에이전트 실행을 의미하지 않습니다. 사용자가 에이전트에 실행을 요청한 뒤 도구로 `running`을 보고하고 결과를 제출합니다. 변경 요청은 `expectedRevision`을 확인합니다. 취소·실패·완료된 작업의 후속 쓰기는 거부하며, 알 수 없는 요청을 새로 생성하지 않습니다. 수동 JSON 가져오기도 같은 결과 검증과 상태 전이를 사용합니다.
+
+RepoFit 서버는 모델을 호출하지 않고 에이전트 토큰을 받지 않습니다. 도구는 로컬 파일을 읽거나 코드를 실행하지 않습니다. 사용자의 기존 에이전트가 허용된 범위에서 검토하며 결과는 에이전트가 작성한 내용으로 표시합니다. 초기 요청은 검토 전용이고 코드 변경·의존성 설치·테스트 실행을 자동 승인하지 않습니다. 요청과 결과는 현재 탭 메모리만 사용하며 서버 저장·새로고침 복원·다른 탭 동기화는 제공하지 않습니다.
+
+WebMCP 검증은 지원되는 브라우저에서 도구를 실제로 발견하고, 요청 읽기 → 진행 보고 → 결과 제출 → 화면 반영을 확인해야 합니다. 이전 revision과 취소된 요청에 대한 쓰기 거부도 확인합니다. 사용자 스킬의 품질 비교, 스킬 트렌드와 개선안은 이후 기능이며 현재 자동 평가하지 않습니다.
 
 ## 인증
 
