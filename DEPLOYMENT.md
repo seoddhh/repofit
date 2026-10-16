@@ -8,6 +8,12 @@ RepoFit의 Vinext/Vite 앱과 서버 API는 ChatGPT Sites의 Cloudflare Workers 
 
 Sites 프로젝트 식별자는 `.openai/hosting.json`에 보관합니다. 소유자만 접근하는 비공개 배포를 완료했으며, 실제 ChatGPT 로그인 후 사이트 복귀와 계정 정보 표시를 확인했습니다. 공개 서비스로 전환할 때는 Sites의 사이트 접근 범위를 별도로 변경해야 합니다.
 
+## GitHub 소스 관리와 배포 이력
+
+개발 소스는 GitHub의 `seoddhh/repofit`에서 관리하며, 로컬 `main`은 `origin/main`을 추적합니다. Sites의 소스 저장과 실제 사이트 배포는 GitHub push와 별도 단계입니다. 변경 완료 후에는 검증한 수정 사항을 공동 작성자 표기 없이 커밋하고 `git push origin main`으로 GitHub에도 동기화합니다. Sites에 이미 저장한 커밋은 수정하거나 덮어쓰지 않고 이력을 보존합니다.
+
+2026-10-17 배포 버전 2의 소스는 `f65daedacaff37dc5bde069ce06abb7888498421`입니다. 클라이언트 빌드에 `preserveEntrySignatures: "strict"`를 적용해 지연 로드 라우터 함수 누락으로 메뉴 이동이 실패하던 문제를 수정했습니다. 프로덕션 빌드와 실제 배포 사이트에서 내 프로젝트·분석 기록 이동, 뒤로 가기와 개선 목표 유지를 확인했습니다.
+
 ## 로그인 연결
 
 - 플랫폼이 소유하는 `/signin-with-chatgpt` → 인증 → `/callback` → 원래 화면 흐름을 사용합니다. 별도 OAuth 클라이언트 시크릿이나 앱 자체 토큰 저장소를 만들지 않습니다.
