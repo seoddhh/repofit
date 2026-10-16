@@ -23,8 +23,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
       </section>
       <div className="account-information">
         <section className="surface"><div className="section-heading"><h2><ShieldCheck size={18}/> 계정 정보</h2></div><p>RepoFit은 Sites가 인증한 계정 식별자, 이메일과 표시 이름을 받습니다. 계정 식별자는 사용자 구분에, 이름과 이메일은 계정 표시에 사용합니다.</p><p>ChatGPT 비밀번호나 대화 기록은 받지 않습니다. 현재 프로젝트와 적용 검토는 이 탭에서만 보관됩니다.</p></section>
-        <section className="surface"><div className="section-heading"><h2>사용자의 ChatGPT 플랜</h2><span className="subtle-badge">연결 준비 중</span></div><p>로그인과 AI 실행 권한은 별도입니다. 사용자 플랜으로 분석하는 기능은 이 배포 환경의 지원과 사용 동의를 확인한 뒤 제공됩니다.</p><p>별도로 내 에이전트 검토를 사용할 수 있습니다. 사용자가 쓰는 에이전트가 자신의 계정과 권한으로 검토하고, RepoFit은 결과를 표시합니다.</p></section>
-      <Link href="/agent" className="secondary-button">내 에이전트로 검토 <ArrowRight size={15}/></Link></div>
+        <section className="surface"><div className="section-heading"><h2>사용자의 ChatGPT 플랜</h2><span className="subtle-badge">연결 준비 중</span></div><p>로그인과 AI 실행 권한은 별도입니다. 사용자 플랜으로 분석하는 기능은 이 배포 환경의 지원과 사용 동의를 확인한 뒤 제공됩니다.</p><p>프로젝트의 에이전트 검토와 내 에이전트의 스킬 탐색을 사용할 수 있습니다. 사용자가 쓰는 에이전트가 자신의 계정과 권한으로 검토하고, RepoFit은 결과를 표시합니다.</p></section>
+      <Link href="/agent" className="secondary-button">에이전트에 추가할 스킬 찾기 <ArrowRight size={15}/></Link></div>
     </div>
   </>;
 }

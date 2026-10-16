@@ -5,7 +5,7 @@ import { createAgentTask, reviseAgentTask, submissionSchema, type AgentTask } fr
 import { createAgentTools, type WebMcpRegistry } from '@/lib/agent-tools';
 
 type AgentWorkspace = {
-  tasks: AgentTask[]; selectedId: string | null; selectTask: (id: string) => void;
+  tasks: AgentTask[]; selectedId: string | null; selectTask: (id: string, purpose?: AgentTask['purpose']) => void;
   connection: 'checking' | 'available' | 'unsupported' | 'error';
   createTask: (input: unknown) => AgentTask; cancelTask: (id: string) => void; importResult: (input: unknown) => void;
 };
@@ -33,11 +33,13 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
     const parsed = submissionSchema.parse(input);
     const task = getTask(parsed.taskId);
     if (task.revision !== parsed.expectedRevision) throw new Error('작업이 변경됐습니다. 최신 요청 번호와 revision을 확인해 주세요.');
+    if (task.purpose === 'skills' && !parsed.result.skillFit) throw new Error('스킬 검토 결과에는 skillFit을 포함해 주세요.');
     const started = task.status === 'queued' ? update(task.id, task.revision, { status: 'running', message: '사용자가 에이전트 결과를 가져오고 있습니다.' }) : task;
     update(started.id, started.revision, { status: 'completed', result: parsed.result });
   }, [getTask, update]);
-  const selectTask = useCallback((id: string) => {
-    getTask(id);
+  const selectTask = useCallback((id: string, purpose?: AgentTask['purpose']) => {
+    const task = getTask(id);
+    if (purpose && task.purpose !== purpose) throw new Error('이 화면의 검토 종류와 요청이 다릅니다.');
     state.current.selectedId = id;
     setSelectedId(id);
   }, [getTask]);
@@ -47,7 +49,7 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
     if (typeof registry?.registerTool !== 'function') { setConnection('unsupported'); return; }
     const lifecycle = new AbortController();
     const tools = createAgentTools({
-      context: () => ({ protocolVersion: 1, scope: 'review_only', storage: 'current_tab_memory', skillPath: '/skills/repofit-review/SKILL.md', selectedTaskId: state.current.selectedId, tasks: state.current.tasks.map(task => ({ id: task.id, candidate: task.candidate, status: task.status, revision: task.revision })) }),
+      context: () => ({ protocolVersion: 2, scope: 'review_only', storage: 'current_tab_memory', skillPath: '/skills/repofit-review/SKILL.md', selectedTaskId: state.current.selectedId, tasks: state.current.tasks.map(task => ({ id: task.id, purpose: task.purpose, candidate: task.candidate, status: task.status, revision: task.revision })) }),
       task: getTask,
       progress: input => update(input.taskId, input.expectedRevision, { status: input.status, message: input.message }),
       submit: input => update(input.taskId, input.expectedRevision, { status: 'completed', result: input.result }),

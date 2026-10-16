@@ -15,7 +15,7 @@ try {
   const require = createRequire(import.meta.url);
   const { createAgentTask, reviseAgentTask, reviewResultSchema, resultMarkdown, taskPrompt } = require(join(temporary, 'agent-review.js'));
   const { createAgentTools } = require(join(temporary, 'agent-tools.js'));
-  const input = { project: { kind: 'github', repository: 'https://github.com/owner/app' }, candidate: 'owner/tool', goal: '테스트 설정 단순화' };
+  const input = { purpose: 'project', project: { kind: 'github', repository: 'https://github.com/owner/app' }, candidate: 'owner/tool', goal: '테스트 설정 단순화' };
   const created = createAgentTask(input);
   assert.equal(created.project.repository, 'owner/app');
   assert.equal(created.status, 'queued');
@@ -24,6 +24,13 @@ try {
   assert.throws(() => createAgentTask({ ...input, autoExecute: true }));
   const local = createAgentTask({ ...input, project: { kind: 'local', label: '현재 열린 앱' } });
   assert.equal(local.project.label, '현재 열린 앱');
+  const discovery = createAgentTask({ purpose: 'skills', agentProfile: { name: 'Codex', currentSkills: [] }, goal: '문서와 코드 리뷰에 쓸 좋은 스킬 찾기' });
+  assert.equal(discovery.candidate, undefined, 'discovery requires neither candidate nor current skills');
+  assert.equal(discovery.agentProfile.currentSkills.length, 0);
+  assert.throws(() => createAgentTask({ ...input, purpose: 'skills' }), 'project fields cannot leak into a skills request');
+  assert.throws(() => createAgentTask({ purpose: 'skills', agentProfile: { name: 'Codex', currentSkills: [] }, goal: '탐색', candidate: 'https://evil.example/skill' }));
+  const targetedSkill = createAgentTask({ purpose: 'skills', agentProfile: { name: 'Codex', currentSkills: ['pdf: 문서 읽기'] }, candidate: 'https://github.com/owner/skills', goal: '문서 작업 보강' });
+  assert.equal(targetedSkill.candidate, 'owner/skills');
   const report = { agent: '연동 테스트', verdict: 'hold', summary: '검증용 결과', reasons: ['실제 검토 전'], benefits: [], risks: [], changes: [], evidence: [{ label: '공식 레포', url: 'https://github.com/owner/tool' }], validation: [{ check: '호환성', status: 'not_run', detail: '실행하지 않음' }], limitations: ['검증용 자료'] };
   for (const url of ['javascript:alert(1)', 'http://example.com', 'https://token@example.com']) assert.throws(() => reviewResultSchema.parse({ ...report, evidence: [{ label: 'unsafe', url }] }));
   assert.throws(() => reviewResultSchema.parse({ ...report, reasons: [] }));
@@ -51,6 +58,15 @@ try {
   current = reviseAgentTask(local, 0, { status: 'canceled', message: '사용자 취소' });
   assert.equal(call('repofit_update_progress', { taskId: current.id, expectedRevision: 1, status: 'running', message: '취소 후 업데이트' }).ok, false);
   assert.equal(call('repofit_submit_review', { taskId: current.id, expectedRevision: 1, result: report }).ok, false);
+  current = reviseAgentTask(discovery, 0, { status: 'running', message: '공식 스킬 자료 확인' });
+  assert.equal(call('repofit_submit_review', { taskId: current.id, expectedRevision: 1, result: report }).ok, false, 'a skills review must include the skill assessment');
+  assert.equal(current.revision, 1);
+  const skillFit = { recommendations: [{ repository: 'https://github.com/owner/skills', skill: 'review', benefit: '리뷰 기준과 확인 순서를 제공' }], addedCapabilities: ['코드 리뷰'], overlaps: ['기존 스킬 미제공으로 미확인'], conflicts: [], integrationSteps: ['공식 설치 절차 확인'] };
+  const skillsDone = call('repofit_submit_review', { taskId: current.id, expectedRevision: 1, result: { ...report, skillFit } });
+  assert.equal(skillsDone.data.result.skillFit.recommendations[0].repository, 'owner/skills');
+  assert.ok(resultMarkdown(current).includes('review (owner/skills)'));
+  assert.ok(taskPrompt(discovery, 'https://repofit.example').includes('/agent?task='));
+  assert.ok(taskPrompt(created, 'https://repofit.example').includes('/project?mode=agent&task='));
   current = createAgentTask(input);
   assert.equal(call('repofit_update_progress', { taskId: current.id, expectedRevision: 0, status: 'failed', message: '권한 없음' }).data.status, 'failed');
   assert.equal(call('repofit_get_task', { taskId: crypto.randomUUID() }).ok, false);
