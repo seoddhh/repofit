@@ -9,7 +9,7 @@ export function EditorialBridge() {
     if (!registry?.registerTool) return;
     const lifecycle = new AbortController();
     async function rpc(method: string, params?: unknown) {
-      const response = await fetch('/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: lifecycle.signal, body: JSON.stringify({ jsonrpc: '2.0', id: crypto.randomUUID(), method, params }) });
+      const response = await fetch('/api/editorial', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: lifecycle.signal, body: JSON.stringify({ jsonrpc: '2.0', id: crypto.randomUUID(), method, params }) });
       if (!response.ok) throw new Error('해설 도구에 연결하지 못했습니다.');
       return await response.json() as { result?: { tools?: { name: string; description: string; inputSchema: object }[]; isError?: boolean; content?: { type: string; text: string }[] }; error?: { message: string } };
     }
