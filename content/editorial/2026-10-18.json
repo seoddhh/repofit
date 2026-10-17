@@ -1,0 +1,543 @@
+{
+  "schemaVersion": 1,
+  "articles": [
+    {
+      "repository": "anthropics/claude-plugins-official",
+      "generatedAt": "2026-10-17T18:31:24.130Z",
+      "evidenceFetchedAt": "2026-10-17T17:12:38.935Z",
+      "content": {
+        "tagline": "Claude Code의 명령·스킬·외부 도구 연결을 묶어서 설치하는 공식 플러그인 카탈로그입니다.",
+        "summary": "Claude Code에서 반복 작업 명령, 검토 지침, 외부 연결을 따로 설정하는 대신 필요한 구성을 묶어서 설치하는 카탈로그입니다. Anthropic 제작 항목과 외부 제작 항목을 구분합니다.\n\n플러그인은 메타데이터에 명령(commands), 역할별 지침(agents), 작업 요령(skills), 외부 도구 연결(MCP)을 담을 수 있습니다. 앱에 넣는 Python 라이브러리가 아니라 개발 에이전트의 작업 환경을 확장하는 자료입니다.",
+        "useCases": [
+          "반복 설정을 줄이는 예: 팀의 검토 순서와 체크리스트를 담은 플러그인을 설치하고 관련 명령·스킬을 호출하는 흐름을 구성할 수 있습니다. 구조를 설명하는 예시이며 특정 플러그인의 성능 검증은 아닙니다.",
+          "직접 만드는 경우: 작업 명령과 역할별 지침을 플러그인 구조에 배치해 공유합니다. 결과는 팀원도 설치할 수 있는 설정 묶음입니다."
+        ],
+        "strengths": [
+          "명령·역할·스킬·연결을 같은 단위로 관리합니다.",
+          "공식 제작 항목과 외부 항목을 구분합니다."
+        ],
+        "limitations": [
+          "등록이 안전성과 호환성을 보증하지는 않습니다. 개별 권한과 외부 서버를 확인하세요.",
+          "다른 에이전트에서의 호환성은 별도 확인 대상입니다."
+        ],
+        "gettingStarted": "Claude Code의 /plugin > Discover에서 필요한 항목을 고르고, 해당 설명과 권한을 확인한 뒤 공식 설치 안내를 따르세요.",
+        "trendReasons": [
+          {
+            "text": "2026년 10월 18일 02:12 KST 관측값은 일간 트렌딩 1위와 오늘 받은 스타 1,383개입니다. README는 플러그인 탐색·설치와 스킬 묶음 등록을 안내합니다.",
+            "kind": "fact",
+            "sourceUrls": [
+              "https://github.com/trending?since=daily",
+              "https://github.com/anthropics/claude-plugins-official/blob/main/README.md"
+            ]
+          },
+          {
+            "text": "차별점은 모델에 붙이는 작업 방식을 설치 가능한 묶음으로 공유한다는 점입니다. 다만 확보한 자료에는 이번 상승을 촉발한 날짜가 있는 발표나 확산 경로가 없어, 특정 사건을 인기 원인으로 확정할 수 없습니다.",
+            "kind": "inference",
+            "sourceUrls": [
+              "https://github.com/anthropics/claude-plugins-official/blob/main/README.md"
+            ]
+          }
+        ]
+      },
+      "sources": [
+        {
+          "title": "공식 GitHub 저장소",
+          "url": "https://github.com/anthropics/claude-plugins-official"
+        },
+        {
+          "title": "공식 README",
+          "url": "https://github.com/anthropics/claude-plugins-official/blob/main/README.md"
+        },
+        {
+          "title": "GitHub 오늘의 트렌딩",
+          "url": "https://github.com/trending?since=daily"
+        }
+      ]
+    },
+    {
+      "repository": "madslorentzen/ai-job-search",
+      "generatedAt": "2026-10-17T18:31:26.663Z",
+      "evidenceFetchedAt": "2026-10-17T17:12:40.024Z",
+      "content": {
+        "tagline": "내 경력과 채용 공고를 비교하고, 회사별 지원서 PDF와 면접 준비 자료를 만드는 구직 워크플로입니다.",
+        "summary": "일반 챗봇에 자기소개서를 한 번 써 달라고 요청하는 것과 달리, AI Job Search는 내 프로필·공고·제출 문서·지원 결과를 파일로 관리하는 작업 틀입니다. Claude Code가 이 자료를 읽고 공고 평가, 문서 작성, 검토, 면접 준비를 연결합니다.\n\n공식 /apply 흐름은 공고 URL 또는 본문과 내 프로필을 입력받아 적합성을 평가한 뒤 이력서와 커버레터를 작성합니다. 검토 단계의 피드백을 반영하고 LaTeX 문서를 PDF로 컴파일해 레이아웃과 텍스트 추출 상태를 확인하도록 구성돼 있습니다. 핵심 결과물은 대화 답변을 넘어 실제 검토·제출할 수 있는 문서와 지원 기록입니다.",
+        "useCases": [
+          "공고 하나에 지원하는 예: 실제 경력으로 프로필을 만든 뒤 /apply에 공고를 전달합니다. 요구 역량과 내 경험을 비교한 평가, 그 회사에 맞춘 문서 초안, PDF 확인 결과를 받아 사람이 사실관계를 검토합니다.",
+          "다음 지원을 준비하는 경우: 같은 프로필을 사용해 다른 공고를 평가하고 회사별 제출 문서와 결과를 관리합니다. 매번 경력 전체를 다시 붙여 넣는 수고를 줄이는 구조입니다."
+        ],
+        "strengths": [
+          "공고 평가부터 초안 검토와 PDF 확인까지 작업 단계가 연결됩니다.",
+          "지원 이력과 제출 자료를 다음 지원·면접 준비의 맥락으로 사용할 수 있습니다."
+        ],
+        "limitations": [
+          "개인 프로필이 추적 파일에 기록될 수 있습니다. 개인 구직용 저장소의 공개 범위를 먼저 확인하세요.",
+          "기본 채용 포털은 덴마크 중심이며 Python·Bun·LaTeX와 에이전트 이용 환경이 필요합니다. 국내 채용 사이트 지원은 별도 검토 대상입니다."
+        ],
+        "gettingStarted": "공식 SETUP 안내에서 개인 자료를 비공개로 보관하는 구성을 확인하고 /setup으로 실제 경력을 입력하세요. 공고 하나에서 /apply를 시험하고 생성된 문서를 제출 전에 직접 검토하세요.",
+        "trendReasons": [
+          {
+            "text": "확인한 v1.7.2는 2026년 9월 29일 UTC 발표됐습니다. PDF의 빈 공간·페이지 경계·텍스트 검사, 채용 URL 검증, 비ASCII 문자 처리 등을 개선했습니다. 이는 지원서가 실제 파일로 완성되는 과정의 오류를 줄이려는 변경입니다.",
+            "kind": "fact",
+            "sourceUrls": [
+              "https://github.com/MadsLorentzen/ai-job-search/releases/tag/v1.7.2"
+            ]
+          },
+          {
+            "text": "이 도구의 구체적인 차이는 ‘지원서 문장 생성’에 머물지 않고 공고 평가와 출력 문서 확인까지 연결한다는 점입니다. 다만 위 릴리스는 일간 트렌딩 관측보다 약 18일 앞선 자료이므로, 이를 이번 상승의 직접 원인으로 해석할 근거는 부족합니다.",
+            "kind": "inference",
+            "sourceUrls": [
+              "https://github.com/MadsLorentzen/ai-job-search/blob/master/README.md",
+              "https://github.com/MadsLorentzen/ai-job-search/releases/tag/v1.7.2"
+            ]
+          }
+        ]
+      },
+      "sources": [
+        {
+          "title": "공식 GitHub 저장소",
+          "url": "https://github.com/MadsLorentzen/ai-job-search"
+        },
+        {
+          "title": "공식 README",
+          "url": "https://github.com/MadsLorentzen/ai-job-search/blob/master/README.md"
+        },
+        {
+          "title": "공식 릴리스 · v1.7.2 - Measured PDFs, CLIs that stop trusting the digits, tools that survive non-ASCII",
+          "url": "https://github.com/MadsLorentzen/ai-job-search/releases/tag/v1.7.2"
+        },
+        {
+          "title": "GitHub 오늘의 트렌딩",
+          "url": "https://github.com/trending?since=daily"
+        }
+      ]
+    },
+    {
+      "repository": "affaan-m/ecc",
+      "generatedAt": "2026-10-17T18:31:28.618Z",
+      "evidenceFetchedAt": "2026-10-17T17:12:41.542Z",
+      "content": {
+        "tagline": "계획·검토·검증 지침과 반복 실행 설정으로 코딩 에이전트의 작업 방식을 구성하는 설정 모음입니다.",
+        "summary": "ECC는 새 모델을 학습시키는 프로젝트가 아니라, 기존 코딩 에이전트가 일하는 절차를 구성하는 저장소입니다. 역할별 지침, 재사용 스킬, 규칙, 특정 시점에 동작을 연결하는 훅 등을 묶습니다.\n\n예를 들어 개발 요청에 계획 단계와 코드 검토·검증 절차를 붙이고, 세션에서 발견한 작업 패턴을 재사용하는 구성을 살펴볼 수 있습니다. 공식 문서는 학습한 패턴을 신뢰도와 함께 보는 기능과 관련 패턴을 스킬로 묶는 흐름을 소개합니다. 긴 지시문 하나를 매번 입력하는 대신 작업 단계와 반복 규칙을 관리하는 것이 핵심입니다.",
+        "useCases": [
+          "개발 절차를 정리하는 예: 팀에서 쓰는 에이전트와 맞는 설정을 고르고 계획·리뷰·검증 역할을 구성합니다. 기능 요청이 들어오면 코드만 받는 대신 변경 계획과 검토 결과를 함께 확인하는 흐름을 만들 수 있습니다.",
+          "반복 패턴을 관리하는 경우: 공식 문서의 /instinct-status와 /evolve 흐름을 검토해, 학습한 패턴을 살펴보고 관련 항목을 스킬로 묶는 방식을 확인할 수 있습니다. 실제 학습 품질은 이 해설에서 시험하지 않았습니다."
+        ],
+        "strengths": [
+          "코딩 작업의 규칙과 검증 절차를 파일 단위로 검토하고 공유할 수 있습니다.",
+          "문서가 중복 설치로 훅이 두 번 실행되는 상황과 설치 경로 선택도 설명합니다."
+        ],
+        "limitations": [
+          "플러그인과 수동 전체 설치를 겹치면 규칙이나 훅이 중복될 수 있습니다. 에이전트별 지원 경로를 먼저 확인하세요.",
+          "설정을 늘린다고 작업 품질이 자동으로 올라가지는 않습니다. 기존 규칙과 겹치는 부분부터 비교해야 합니다."
+        ],
+        "gettingStarted": "공식 저장소에서 사용하는 에이전트의 설치 경로 하나를 선택하세요. 기존 설정을 보관하고 필요한 역할·스킬부터 검토한 뒤 작은 작업에서 결과를 비교하세요.",
+        "trendReasons": [
+          {
+            "text": "2026년 10월 1일 UTC 발표된 v2.2.3은 pi/core의 명칭 정리와 npm 배포 후 확인 대기 절차를 보완했습니다. 릴리스 설명상 핵심 프로필 내용은 그대로이므로 새로운 대규모 기능 출시로 소개하면 부정확합니다.",
+            "kind": "fact",
+            "sourceUrls": [
+              "https://github.com/affaan-m/ECC/releases/tag/v2.2.3"
+            ]
+          },
+          {
+            "text": "이 프로젝트가 다루는 문제는 에이전트가 코드를 쓰는 능력보다 작업 절차의 일관성입니다. 계획·검토·재사용 패턴을 묶는 접근에 주목할 수 있습니다. 확보한 공식 자료만으로는 이번 트렌딩의 직접적인 확산 계기를 확인하지 못했습니다.",
+            "kind": "inference",
+            "sourceUrls": [
+              "https://github.com/affaan-m/ECC"
+            ]
+          }
+        ]
+      },
+      "sources": [
+        {
+          "title": "공식 GitHub 저장소",
+          "url": "https://github.com/affaan-m/ECC"
+        },
+        {
+          "title": "공식 릴리스 · v2.2.3",
+          "url": "https://github.com/affaan-m/ECC/releases/tag/v2.2.3"
+        },
+        {
+          "title": "GitHub 오늘의 트렌딩",
+          "url": "https://github.com/trending?since=daily"
+        }
+      ]
+    },
+    {
+      "repository": "hkuds/cli-anything",
+      "generatedAt": "2026-10-17T18:31:31.084Z",
+      "evidenceFetchedAt": "2026-10-17T17:14:13.791Z",
+      "content": {
+        "tagline": "기존 소프트웨어를 에이전트가 명령으로 다루도록 CLI를 만들고 배포·검색하는 도구입니다.",
+        "summary": "CLI-Anything는 소프트웨어를 에이전트가 호출할 명령으로 감싸는 인터페이스를 만드는 프로젝트입니다. 사용법은 두 가지입니다. CLI-Hub에서 이미 만들어진 도구를 찾아 쓰거나, 대상 소프트웨어의 소스와 기능을 분석해 새 CLI를 생성합니다.\n\n공식 생성 흐름은 분석 → 명령 설계 → 구현 → 테스트 계획·작성 → 문서화·패키징으로 이어집니다. 결과물은 에이전트가 반복 호출할 수 있는 명령과 구조화된 JSON 출력입니다. 화면의 버튼 위치를 매번 찾아 클릭하는 자동화와 비교하면, 작업을 명시적인 명령과 결과 형식으로 표현한다는 점이 다릅니다.",
+        "useCases": [
+          "기존 도구를 쓰는 예: 공식 README는 CLI-Hub에서 GIMP용 CLI를 찾아 설치하고 실행하는 경로를 안내합니다. 선택한 CLI가 필요로 하는 GIMP 본체도 준비해야 합니다.",
+          "새 도구를 만드는 예: 공식 GIMP 예시는 소스 경로를 생성기에 주고 CLI를 만든 뒤, 1920×1080 프로젝트를 생성하고 배경 레이어를 추가하는 명령을 보여줍니다. 이는 문서 예시이며 이번에 실행한 결과는 아닙니다."
+        ],
+        "strengths": [
+          "사용할 도구를 찾는 CLI-Hub와 새 인터페이스를 만드는 생성 흐름을 함께 제공합니다.",
+          "테스트와 JSON 출력까지 생성 과정에 포함해 에이전트가 다룰 인터페이스를 구체화합니다."
+        ],
+        "limitations": [
+          "대상 앱·백엔드와 실행 환경이 필요합니다. 모든 기능이 자동으로 지원되는 것은 아닙니다.",
+          "생성된 CLI의 동작 범위·부작용·테스트 결과는 실제 대상 프로그램에서 검토해야 합니다."
+        ],
+        "gettingStarted": "먼저 CLI-Hub에 원하는 소프트웨어가 있는지 확인하세요. 없을 때만 공식 생성 경로와 대상 소스·에이전트·Python 준비 조건을 검토하는 편이 적절합니다.",
+        "trendReasons": [
+          {
+            "text": "확인한 v0.4.0은 2026년 6월 25일 UTC 발표됐고, 여러 CLI를 작업 단위로 구성하는 CLI-Matrix와 새 CLI·오류 수정을 소개했습니다. 10월의 트렌딩을 ‘새 버전이 방금 출시돼서’라고 설명할 수 있는 시점은 아닙니다.",
+            "kind": "fact",
+            "sourceUrls": [
+              "https://github.com/HKUDS/CLI-Anything/releases/tag/v0.4.0"
+            ]
+          },
+          {
+            "text": "핵심은 에이전트가 사용할 도구의 범위를 기존 소프트웨어로 넓힌다는 점입니다. 특히 GUI 조작 대신 명령·JSON으로 작업을 전달하는 접근이 차별점입니다. 다만 기존 기능의 재조명인지 특정 공유의 영향인지는 현재 게시 가능한 근거로 확인하지 못했습니다.",
+            "kind": "inference",
+            "sourceUrls": [
+              "https://github.com/HKUDS/CLI-Anything"
+            ]
+          }
+        ]
+      },
+      "sources": [
+        {
+          "title": "공식 GitHub 저장소",
+          "url": "https://github.com/HKUDS/CLI-Anything"
+        },
+        {
+          "title": "공식 릴리스 · v0.4.0",
+          "url": "https://github.com/HKUDS/CLI-Anything/releases/tag/v0.4.0"
+        },
+        {
+          "title": "GitHub 오늘의 트렌딩",
+          "url": "https://github.com/trending?since=daily"
+        }
+      ]
+    },
+    {
+      "repository": "k-dense-ai/scientific-agent-skills",
+      "generatedAt": "2026-10-17T18:31:38.039Z",
+      "evidenceFetchedAt": "2026-10-17T17:14:14.899Z",
+      "content": {
+        "tagline": "연구 데이터를 읽고 과학 도구·데이터베이스를 사용하는 절차를 에이전트에 제공하는 스킬 모음입니다.",
+        "summary": "Scientific Agent Skills는 과학 전용 모델이나 분석 앱이 아니라, 기존 에이전트가 연구 도구를 사용할 때 참고할 지침과 예시의 모음입니다. Scanpy·RDKit 같은 패키지와 과학 데이터베이스를 어떤 순서로 사용하는지 작업 단위로 설명합니다.\n\n공식 예시에는 10X 단일세포 데이터를 읽고 품질을 확인한 뒤 공개 참조 자료와 비교해 세포 유형과 분석 결과를 정리하는 흐름이 있습니다. 논문 검색·데이터 조회·분석 코드를 따로 연결하던 작업을 관련 스킬을 참고하는 에이전트의 흐름으로 구성하는 것입니다. 스킬 파일을 추가하는 것과 실제 분석 패키지·데이터 접근 권한을 준비하는 것은 별개입니다.",
+        "useCases": [
+          "단일세포 분석 예: 10X 데이터와 분석 목표를 입력하고 Scanpy 등 관련 스킬의 절차에 따라 품질 확인·참조 자료 비교·결과 정리를 요청합니다. 산출물은 검토할 분석 코드와 표·그림이며, 연구자가 방법과 해석을 확인해야 합니다.",
+          "문헌을 연결하는 경우: 특정 연구 질문에 맞는 데이터베이스와 논문을 조사하고 근거를 붙인 연구 요약을 구성할 수 있습니다. 공식 예시는 PubMed 검색을 다른 도구의 분석 단계와 함께 연결합니다."
+        ],
+        "strengths": [
+          "도구 이름 목록을 넘어 분야별 입력·분석 절차·사용 예시를 제공합니다.",
+          "패키지 의존성과 데이터베이스 활용을 연구 작업의 맥락에서 확인할 수 있습니다."
+        ],
+        "limitations": [
+          "스킬 설치만으로 과학 패키지가 모두 설치되지는 않습니다. 작업별 환경·버전·데이터 권한을 준비해야 합니다.",
+          "구조 검사와 과학적 타당성 검증은 다릅니다. 실제 연구 결과의 재현성과 해석은 별도로 검토해야 합니다."
+        ],
+        "gettingStarted": "자신의 연구 작업 하나에 맞는 스킬을 고르고 compatibility와 준비 조건을 읽으세요. 공개 예제 데이터와 분리된 환경에서 분석 결과를 확인한 뒤 범위를 넓히세요.",
+        "trendReasons": [
+          {
+            "text": "2026년 10월 1일 UTC의 v2.72.0 릴리스는 과학 스킬의 설명 가이드 추가와 일부 문서 스킬 제거를 기록합니다. 연구 주제별 지침을 어떻게 발견하고 이해하게 할지 개선한 변경으로 읽을 수 있습니다.",
+            "kind": "fact",
+            "sourceUrls": [
+              "https://github.com/K-Dense-AI/scientific-agent-skills/releases/tag/v2.72.0"
+            ]
+          },
+          {
+            "text": "주목할 부분은 범용 에이전트에 연구 분야의 작업 절차를 재사용 가능하게 제공한다는 점입니다. 다만 확인한 릴리스와 이번 일간 스타 증가 사이의 인과관계는 입증되지 않았으며, 실제 연구 성과나 이용자 수를 이 해설에서 검증한 것은 아닙니다.",
+            "kind": "inference",
+            "sourceUrls": [
+              "https://github.com/K-Dense-AI/scientific-agent-skills",
+              "https://github.com/K-Dense-AI/scientific-agent-skills/releases/tag/v2.72.0"
+            ]
+          }
+        ]
+      },
+      "sources": [
+        {
+          "title": "공식 GitHub 저장소",
+          "url": "https://github.com/K-Dense-AI/scientific-agent-skills"
+        },
+        {
+          "title": "공식 릴리스 · v2.72.0",
+          "url": "https://github.com/K-Dense-AI/scientific-agent-skills/releases/tag/v2.72.0"
+        },
+        {
+          "title": "GitHub 오늘의 트렌딩",
+          "url": "https://github.com/trending?since=daily"
+        }
+      ]
+    },
+    {
+      "repository": "android/skills",
+      "generatedAt": "2026-10-17T18:31:45.927Z",
+      "evidenceFetchedAt": "2026-10-17T17:14:15.950Z",
+      "content": {
+        "tagline": "Android 공식 개발 지침을 AI 에이전트가 작업할 때 참고하는 모듈식 스킬로 제공하는 저장소입니다.",
+        "summary": "Android Skills는 앱에 넣는 Kotlin 라이브러리가 아닙니다. 코딩 에이전트에게 Android 작업의 절차와 참고 자료를 제공하는 SKILL.md 모음입니다. Android CLI로 필요한 스킬을 프로젝트나 사용 중인 에이전트에 추가하면, 관련 요청에서 그 지침을 찾아 사용하도록 구성할 수 있습니다.\n\n예를 들어 공식 README는 화면을 edge-to-edge로 만드는 작업 요청을 제시합니다. 독자가 앱 코드와 원하는 변경을 제공하면 에이전트가 관련 스킬을 참고해 작업하는 흐름입니다. 모델이 예전 학습 내용만으로 방법을 추측하게 두는 것과 비교해, 공식 Android 지침을 작업 맥락에 넣는다는 차이가 있습니다.",
+        "useCases": [
+          "화면 변경 예: 스킬을 설치한 에이전트에 Android 프로젝트와 ‘화면을 edge-to-edge로 바꿔줘’라는 목표를 전달합니다. 관련 지침을 참고한 변경 제안을 받고 실제 기기·빌드에서 확인합니다. 이는 README의 요청 예시를 풀어쓴 것입니다.",
+          "프로젝트별 적용 예: 전체 스킬 대신 필요한 항목을 프로젝트 경로에 추가합니다. 팀은 앱 의존성을 바꾸는 것과 에이전트의 참고 지침을 바꾸는 것을 구분해 관리할 수 있습니다."
+        ],
+        "strengths": [
+          "공식 Android 개발 가이드를 에이전트가 활용하는 작업 단위로 제공합니다.",
+          "개별 항목과 전체 설치, 대상 에이전트와 프로젝트 경로를 선택하는 방법을 안내합니다."
+        ],
+        "limitations": [
+          "README는 평가에서 모델이 어려워하는 작업에 집중한다고 설명합니다. 모든 Android 개발 영역을 포함하지는 않습니다.",
+          "스킬이 있어도 잘못된 변경은 가능합니다. 앱의 버전 조건과 실제 빌드·화면 결과를 검토해야 합니다."
+        ],
+        "gettingStarted": "공식 README의 Android CLI 또는 플러그인 경로를 확인하고 필요한 스킬부터 선택하세요. android skills add만 실행하면 전체가 아니라 기본 항목만 설치된다는 옵션 차이도 확인하세요.",
+        "trendReasons": [
+          {
+            "text": "확인한 v1.0.15는 2026년 10월 14일 UTC에 발표됐습니다. 트렌딩 관측과 가까운 배포이지만 릴리스 본문에는 세부 변경 설명이 없어 특정 새 기능이 인기를 만들었다고 단정할 수는 없습니다.",
+            "kind": "fact",
+            "sourceUrls": [
+              "https://github.com/android/skills/releases/tag/v1.0.15"
+            ]
+          },
+          {
+            "text": "이 저장소의 차별점은 일반적인 ‘Android를 잘 작성하라’는 프롬프트가 아니라 공식 지침을 설치·갱신 가능한 스킬로 제공한다는 점입니다. 최근 배포와 관심 증가가 함께 관측됐지만 직접적인 확산 원인은 추가 근거가 필요합니다.",
+            "kind": "inference",
+            "sourceUrls": [
+              "https://github.com/android/skills/blob/main/README.md",
+              "https://github.com/android/skills/releases/tag/v1.0.15"
+            ]
+          }
+        ]
+      },
+      "sources": [
+        {
+          "title": "공식 GitHub 저장소",
+          "url": "https://github.com/android/skills"
+        },
+        {
+          "title": "공식 README",
+          "url": "https://github.com/android/skills/blob/main/README.md"
+        },
+        {
+          "title": "공식 릴리스 · Release v1.0.15",
+          "url": "https://github.com/android/skills/releases/tag/v1.0.15"
+        },
+        {
+          "title": "GitHub 오늘의 트렌딩",
+          "url": "https://github.com/trending?since=daily"
+        }
+      ]
+    },
+    {
+      "repository": "stablyai/orca",
+      "generatedAt": "2026-10-17T18:31:47.970Z",
+      "evidenceFetchedAt": "2026-10-17T17:15:06.129Z",
+      "content": {
+        "tagline": "여러 코딩 에이전트의 대화·터미널·분리된 코드 작업과 검토를 한 화면에서 관리하는 개발 작업 공간입니다.",
+        "summary": "Orca는 여러 코딩 에이전트의 대화·터미널·파일 변경을 연결해 관리하는 데스크톱 작업 공간입니다. 에이전트마다 Git worktree, 즉 같은 저장소의 분리된 파일 작업 공간을 만들어 변경을 나눕니다.\n\n터미널 창만 여러 개 여는 방식과 비교해 요청과 코드 변경을 함께 검토하는 것이 핵심입니다. 원격 SSH 작업, 모바일 상태 확인, 브라우저 요소를 요청에 전달하는 기능도 소개합니다.",
+        "useCases": [
+          "구현안 비교 예: 같은 요청을 두 에이전트에 맡기고 각 worktree의 변경을 비교합니다. 결과는 분리된 코드 변경이며 선택과 통합은 검토 후 결정합니다.",
+          "화면 수정 예: 브라우저에서 요소를 선택해 HTML·CSS와 화면 일부를 요청에 전달합니다. 수정할 위치를 긴 글로 설명하는 단계를 줄입니다."
+        ],
+        "strengths": [
+          "대화와 파일 변경을 연결해 검토합니다.",
+          "모바일·원격 작업 경로를 제공합니다."
+        ],
+        "limitations": [
+          "작업을 분리해도 코드 충돌과 품질 검토는 남습니다.",
+          "에이전트별 계정·사용량은 별도이며 저장 자료에 릴리스는 없습니다."
+        ],
+        "gettingStarted": "작은 저장소와 에이전트 하나로 시작해 worktree 변경 검토·통합 방법을 확인한 뒤 작업을 늘리세요.",
+        "trendReasons": [
+          {
+            "text": "공식 README는 분리된 worktree에서 에이전트 결과를 비교하는 흐름과 Design Mode·모바일 기능을 설명합니다. 에이전트의 코드 작성보다 작업 관리에 초점을 둔 구성입니다.",
+            "kind": "fact",
+            "sourceUrls": [
+              "https://github.com/stablyai/orca/blob/main/README.md"
+            ]
+          },
+          {
+            "text": "차별점은 여러 에이전트가 만든 코드와 결과를 관리한다는 점입니다. 현재 저장된 근거에는 날짜가 있는 릴리스나 외부 확산 출처가 없어, 특정 업데이트를 이번 트렌딩의 계기로 지목하지 않습니다.",
+            "kind": "inference",
+            "sourceUrls": [
+              "https://github.com/stablyai/orca/blob/main/README.md"
+            ]
+          }
+        ]
+      },
+      "sources": [
+        {
+          "title": "공식 GitHub 저장소",
+          "url": "https://github.com/stablyai/orca"
+        },
+        {
+          "title": "공식 README",
+          "url": "https://github.com/stablyai/orca/blob/main/README.md"
+        },
+        {
+          "title": "GitHub 오늘의 트렌딩",
+          "url": "https://github.com/trending?since=daily"
+        }
+      ]
+    },
+    {
+      "repository": "anthropics/claude-code",
+      "generatedAt": "2026-10-17T18:31:50.133Z",
+      "evidenceFetchedAt": "2026-10-17T17:15:07.668Z",
+      "content": {
+        "tagline": "프로젝트 파일과 개발 도구를 사용해 코드 설명·수정·검증 작업을 진행하는 코딩 에이전트입니다.",
+        "summary": "Claude Code는 개발자가 자연어로 요청한 작업을 프로젝트 맥락에서 수행하는 도구입니다. 일반 챗봇에 코드 일부를 복사하는 흐름과 달리, 터미널이나 지원되는 개발 환경에서 관련 파일과 도구를 함께 다루는 방식입니다.\n\n가령 작은 프로젝트에서 ‘이 함수가 언제 호출되는지 설명하고 오류 수정안을 제시해줘’라고 요청하면 코드 구조를 조사하고 변경을 제안하는 흐름을 구성할 수 있습니다. 명령 실행과 수정은 허용한 권한 안에서 검토해야 합니다. 이 GitHub 저장소에는 설치 안내·플러그인·변경 내역과 문제 보고 경로가 있으며, 공개 저장소의 범위와 제품 이용 조건은 구분해서 확인해야 합니다.",
+        "useCases": [
+          "코드를 이해하는 예: 프로젝트와 궁금한 동작을 입력으로 주고 관련 파일과 설명을 받습니다. 코드를 대화창으로 조각내어 옮기는 대신 저장소 맥락에서 조사하는 흐름입니다.",
+          "수정을 검토하는 예: 재현할 오류와 수정 범위를 정한 뒤 변경 제안을 받고 diff와 테스트 결과를 확인합니다. 설치만으로 요청이 올바르게 완료되는 것은 아니므로 검증 결과를 함께 읽어야 합니다."
+        ],
+        "strengths": [
+          "자연어 요청을 프로젝트 조사와 개발 도구 작업으로 연결합니다.",
+          "공식 변경 기록으로 모델·플러그인·도구 동작의 수정 내용을 확인할 수 있습니다."
+        ],
+        "limitations": [
+          "계정 이용 조건과 코드·대화의 데이터 처리 정책을 확인해야 합니다.",
+          "수정·명령 실행 권한은 별도로 관리해야 하며, 결과를 사람이 검토하고 필요한 테스트를 수행해야 합니다."
+        ],
+        "gettingStarted": "공식 README의 현재 운영체제별 설치 경로를 확인하세요. 프로젝트에서 코드 설명 요청부터 시작하고, 파일 수정과 실행을 맡길 때는 범위와 권한을 정하세요.",
+        "trendReasons": [
+          {
+            "text": "2026년 10월 16일 20:53 UTC 발표된 v2.1.302는 자동 모드 분류 모델 선택 설정과 유휴 압축 설정을 추가하고, 압축 중 중단·플러그인 설정 저장·도구 처리 등의 오류를 수정했습니다. 트렌딩 관측 전날의 실제 변경입니다.",
+            "kind": "fact",
+            "sourceUrls": [
+              "https://github.com/anthropics/claude-code/releases/tag/v2.1.302"
+            ]
+          },
+          {
+            "text": "이 변경에서 읽을 수 있는 관심사는 새로운 코드 생성 기능뿐 아니라 긴 세션과 플러그인을 실제로 운영할 때의 안정성입니다. 다만 릴리스 시점이 가깝다는 사실만으로 그 버전이 스타 증가를 만들었다고 확인할 수는 없습니다.",
+            "kind": "inference",
+            "sourceUrls": [
+              "https://github.com/anthropics/claude-code/releases/tag/v2.1.302"
+            ]
+          }
+        ]
+      },
+      "sources": [
+        {
+          "title": "공식 GitHub 저장소",
+          "url": "https://github.com/anthropics/claude-code"
+        },
+        {
+          "title": "공식 README",
+          "url": "https://github.com/anthropics/claude-code/blob/main/README.md"
+        },
+        {
+          "title": "공식 릴리스 · v2.1.302",
+          "url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.302"
+        },
+        {
+          "title": "GitHub 오늘의 트렌딩",
+          "url": "https://github.com/trending?since=daily"
+        }
+      ]
+    },
+    {
+      "repository": "debpalash/voicestudio",
+      "generatedAt": "2026-10-17T18:31:52.788Z",
+      "evidenceFetchedAt": "2026-10-17T17:15:08.848Z",
+      "content": {
+        "tagline": "참조 음성·텍스트·영상으로 음성 생성과 더빙을 구성하고 로컬 모델을 관리하는 데스크톱 작업실입니다.",
+        "summary": "VoiceStudio는 음성 모델 하나가 아니라 모델을 선택·설치하고 음성 생성, 더빙, 받아쓰기·전사, 오디오북 작업을 진행하는 앱입니다. 필요한 모델을 내 컴퓨터에서 실행하는 흐름과 선택적인 외부 연결을 제공합니다.\n\n음성 생성에서는 사용 허락이 있는 참조 녹음과 읽을 텍스트를 넣고 오디오를 만듭니다. 더빙은 영상과 시간에 맞춘 음성 작업을 다루며, 오디오북은 긴 텍스트를 장 단위로 처리하는 흐름입니다. 모델 실행 코드를 직접 조합하는 방식과 비교해 음성·작업·모델을 같은 화면에서 관리한다는 점이 다릅니다.",
+        "useCases": [
+          "내레이션 예: 허락받은 짧은 참조 녹음과 설명용 원고를 넣고 필요한 모델을 선택해 음성을 생성합니다. 입력은 녹음·텍스트, 결과는 청취하며 품질을 확인할 오디오입니다.",
+          "긴 문서 제작 예: 장별 텍스트를 오디오북 작업으로 구성하고 생성한 장과 진행 상태를 관리합니다. 확인한 v0.5.6은 긴 장 처리와 재시작·데이터 이동 뒤 결과 보존 개선을 안내합니다."
+        ],
+        "strengths": [
+          "음성 모델 관리와 여러 음성 제작 작업을 하나의 앱으로 묶습니다.",
+          "로컬 API·MCP를 통해 다른 도구의 작업 흐름과 연결하는 경로를 제공합니다."
+        ],
+        "limitations": [
+          "속도·메모리·언어별 음질은 모델과 하드웨어에 따라 다릅니다. Intel Mac은 README의 백엔드 제약을 확인하세요.",
+          "앱과 모델·음성·출력물의 이용 조건은 별개입니다. 사용 허락이 있는 음성으로 시험해야 합니다."
+        ],
+        "gettingStarted": "공식 운영체제별 설치 안내와 하드웨어 조건을 확인하고 짧은 녹음·텍스트로 시작하세요. 필요한 모델의 용량과 이용 조건을 확인한 뒤 결과 음성을 직접 들어보세요.",
+        "trendReasons": [
+          {
+            "text": "2026년 9월 23일 UTC의 v0.5.6은 MCP·API 연결 설정, 참조 음성 교체, 긴 오디오북 장 처리와 결과 보존 개선을 안내합니다. 음성을 한 번 만드는 데서 다른 도구와 연결된 제작 흐름으로 확장하는 변경입니다.",
+            "kind": "fact",
+            "sourceUrls": [
+              "https://github.com/debpalash/VoiceStudio/releases/tag/v0.5.6"
+            ]
+          },
+          {
+            "text": "차별점은 로컬 음성 모델을 설치·관리하고 생성·더빙·긴 문서 작업을 앱에서 이어 간다는 점입니다. 다만 위 릴리스는 트렌딩 관측보다 약 24일 앞서므로 이번 관심 증가를 단순히 새 출시 효과로 설명할 수는 없습니다.",
+            "kind": "inference",
+            "sourceUrls": [
+              "https://github.com/debpalash/VoiceStudio/blob/main/README.md",
+              "https://github.com/debpalash/VoiceStudio/releases/tag/v0.5.6"
+            ]
+          }
+        ]
+      },
+      "sources": [
+        {
+          "title": "공식 GitHub 저장소",
+          "url": "https://github.com/debpalash/VoiceStudio"
+        },
+        {
+          "title": "공식 README",
+          "url": "https://github.com/debpalash/VoiceStudio/blob/main/README.md"
+        },
+        {
+          "title": "공식 릴리스 · v0.5.6 — VoiceStudio",
+          "url": "https://github.com/debpalash/VoiceStudio/releases/tag/v0.5.6"
+        },
+        {
+          "title": "GitHub 오늘의 트렌딩",
+          "url": "https://github.com/trending?since=daily"
+        }
+      ]
+    },
+    {
+      "repository": "anomalyco/opencode",
+      "generatedAt": "2026-10-17T18:31:55.113Z",
+      "evidenceFetchedAt": "2026-10-17T17:15:56.165Z",
+      "content": {
+        "tagline": "코드 탐색·계획과 실제 개발 작업을 모드로 나누어 진행하는 공개 소스 코딩 에이전트입니다.",
+        "summary": "OpenCode는 자연어 요청을 프로젝트에서 수행하는 공개 소스 코딩 에이전트입니다. 공식 저장소는 터미널 설치와 베타 데스크톱 앱, 계획용 plan과 개발용 build 모드를 안내합니다.\n\nplan에서 코드 구조와 수정 계획을 조사하고 검토한 범위를 build에서 작업하는 흐름을 구성할 수 있습니다. README는 plan이 기본적으로 파일 편집을 거부하고 셸 명령 실행 전 허가를 요청한다고 설명합니다. 코드 조각에 대한 답변보다 작업 공간에서 조사와 실행을 구분하는 것이 핵심입니다.",
+        "useCases": [
+          "조사 예: plan에 프로젝트와 ‘로그인 처리 위치를 설명해줘’라는 질문을 주고 관련 코드와 계획을 확인합니다. 요청 문장은 설명용 예시입니다.",
+          "구현 예: 검토한 계획과 범위를 build에서 작업합니다. 결과인 파일 변경과 실행 결과를 확인한 뒤 반영 여부를 결정합니다."
+        ],
+        "strengths": [
+          "계획과 개발 작업을 모드로 나눕니다.",
+          "공개 소스와 설치 안내를 확인할 수 있습니다."
+        ],
+        "limitations": [
+          "자동 수집에서 README·릴리스가 누락돼 저장소 페이지를 추가 확인했습니다. 버전별 최신 변경은 저장 근거에 없습니다.",
+          "모델·계정 조건과 작업 권한은 별도이며 설치·실행은 검증하지 않았습니다."
+        ],
+        "gettingStarted": "공식 설치·설정 안내를 확인하고 작은 프로젝트에서 plan의 조사부터 시작하세요. 수정·실행 범위는 별도로 정하세요.",
+        "trendReasons": [
+          {
+            "text": "공식 저장소는 plan·build와 베타 데스크톱 앱을 안내합니다. 2026년 10월 18일 02:12 KST 수집에서는 일간 10위, 오늘 받은 스타 576개였습니다.",
+            "kind": "fact",
+            "sourceUrls": [
+              "https://github.com/anomalyco/opencode",
+              "https://github.com/trending?since=daily"
+            ]
+          },
+          {
+            "text": "관심을 둘 차이는 에이전트의 소스를 살펴보고 탐색과 실행 경계를 관리하는 흐름입니다. 저장 출처에 날짜가 있는 발표가 없어 특정 버전이나 사건을 상승 원인으로 제시하지 않습니다.",
+            "kind": "inference",
+            "sourceUrls": [
+              "https://github.com/anomalyco/opencode"
+            ]
+          }
+        ]
+      },
+      "sources": [
+        {
+          "title": "공식 GitHub 저장소",
+          "url": "https://github.com/anomalyco/opencode"
+        },
+        {
+          "title": "GitHub 오늘의 트렌딩",
+          "url": "https://github.com/trending?since=daily"
+        }
+      ]
+    }
+  ]
+}
