@@ -10,16 +10,18 @@ export async function collectBriefEvidence(id: string, snapshot: TrendingSnapsho
   };
   const warnings: string[] = [];
   const [readmeResult, releaseResult] = await Promise.allSettled([
-    github(`${base}/readme`).then(r => boundedText(r, 120000)).then(text => JSON.parse(text) as { content?: string; encoding?: string; size?: number; sha?: string; html_url?: string }),
-    github(`${base}/releases?per_page=3`).then(r => boundedText(r, 180000)).then(text => JSON.parse(text) as { name: string; tag_name: string; body: string; html_url: string; published_at: string; draft: boolean; prerelease: boolean }[]),
+    github(`${base}/readme`).then(r => boundedText(r, 400000)).then(text => JSON.parse(text) as { content?: string; encoding?: string; size?: number; sha?: string; html_url?: string }),
+    github(`${base}/releases?per_page=3`).then(r => boundedText(r, 800000)).then(text => JSON.parse(text) as { name: string; tag_name: string; body: string; html_url: string; published_at: string; draft: boolean; prerelease: boolean }[]),
   ]);
   const repoUrl = `https://github.com/${metadata.full_name}`;
   const sources = [{ title: '공식 GitHub 저장소', url: repoUrl }];
   let readme: string | null = null;
   let readmeSha: string | null = null;
-  if (readmeResult.status === 'fulfilled' && readmeResult.value.encoding === 'base64' && readmeResult.value.content && (readmeResult.value.size ?? Infinity) <= 64000) {
+  if (readmeResult.status === 'fulfilled' && readmeResult.value.encoding === 'base64' && readmeResult.value.content && (readmeResult.value.size ?? Infinity) <= 256000) {
     try {
-      readme = new TextDecoder().decode(Uint8Array.from(atob(readmeResult.value.content.replace(/\s/g, '')), c => c.charCodeAt(0))).slice(0, 20000);
+      const decoded = new TextDecoder().decode(Uint8Array.from(atob(readmeResult.value.content.replace(/\s/g, '')), c => c.charCodeAt(0)));
+      readme = decoded.slice(0, 20000);
+      if (decoded.length > 20000) warnings.push('긴 README의 앞부분 20,000자만 확인했습니다.');
       readmeSha = readmeResult.value.sha ?? null;
       sources.push({ title: '공식 README', url: readmeResult.value.html_url?.startsWith(`${repoUrl}/blob/`) ? readmeResult.value.html_url : `${repoUrl}#readme` });
     } catch { warnings.push('README 텍스트를 해석하지 못했습니다.'); }

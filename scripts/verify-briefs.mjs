@@ -47,6 +47,11 @@ try {
   const evidence = await collectBriefEvidence('owner/repo0', snapshot);
   assert.equal(evidence.trending.rank, 1); assert.equal(evidence.sources.length, 4); assert.ok(evidence.readme.includes('<script>'));
   assert.equal((await evidenceFingerprint(evidence)).length, 64);
+  const mockedFetch = globalThis.fetch;
+  globalThis.fetch = async url => url.includes('/readme') ? Response.json({ content: Buffer.from('x'.repeat(100000)).toString('base64'), encoding: 'base64', size: 100000, sha: 'large', html_url: 'https://github.com/owner/repo0/blob/main/README.md' }) : mockedFetch(url);
+  const longEvidence = await collectBriefEvidence('owner/repo0', snapshot);
+  assert.equal(longEvidence.readme.length, 20000); assert.ok(longEvidence.warnings.some(text => text.includes('20,000')));
+  globalThis.fetch = mockedFetch;
   const content = {
     tagline: '프로젝트 자료를 쉽게 살펴보는 공개 도구입니다.', summary: '공식 문서를 근거로 용도와 확인할 부분을 정리한 설명입니다.',
     useCases: ['새로운 프로젝트에 적용할 도구를 비교할 때 활용합니다.'], strengths: ['공식 문서에서 사용 예시와 설정 방법을 제공합니다.'], limitations: ['실제 설치와 실행 호환성은 별도 검증이 필요합니다.'], gettingStarted: '공식 README를 읽고 설치 조건과 사용 예시를 확인하세요.',
@@ -95,6 +100,11 @@ try {
   assert.equal((await POST(new Request('https://repofit.test/mcp', { method: 'POST', body: 'x'.repeat(40001) }))).status, 413);
   globalThis.__briefUser = null;
   assert.equal((await call('read_repository_brief', { repository: 'owner/repo0' })).result.isError, undefined);
+  compile('app/api/editorial/route.ts', 'editorial-api.js', s => s.replaceAll("'@/app/mcp/route'", "'./mcp'"));
+  const browserPost = require(join(temporary, 'editorial-api.js')).POST;
+  assert.equal((await browserPost(new Request('https://repofit.test/api/editorial', { method: 'POST', headers: { Origin: 'https://evil.example' }, body: '{}' }))).status, 403);
+  const browserWrite = await browserPost(new Request('https://repofit.test/api/editorial', { method: 'POST', headers: { Origin: 'https://repofit.test' }, body: JSON.stringify({ method: 'tools/call', params: { name: 'get_editorial_queue' } }) }));
+  assert.equal((await browserWrite.json()).result.isError, true);
   sqlite.close();
   console.log('Brief checks passed: real SQLite persistence, source fingerprints, safe source URLs, immutable evidence, retry batching, stale fallback, and owner-only MCP writes.');
 } finally {
