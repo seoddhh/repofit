@@ -25,7 +25,7 @@ export async function boundedText(response: Response, limit: number): Promise<st
   return new TextDecoder().decode(bytes);
 }
 
-async function github(path: string, accept = 'application/vnd.github+json'): Promise<Response> {
+export async function github(path: string, accept = 'application/vnd.github+json'): Promise<Response> {
   const response = await fetch(`https://api.github.com${path}`, {
     headers: { Accept: accept, 'User-Agent': 'RepoFit', 'X-GitHub-Api-Version': '2022-11-28' },
     signal: AbortSignal.timeout(12000), redirect: 'manual',

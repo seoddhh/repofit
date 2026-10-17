@@ -77,3 +77,11 @@ Sites Dispatch가 `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`�
 `app/globals.css`에 색상, 시스템 글꼴, 표면, 글래스 소재의 공통 토큰을 정의합니다. 탐색 UI에는 반투명 소재·배경 흐림·밝은 테두리를 사용하고 자료·코드·보고서는 불투명한 표면에서 읽도록 구성했습니다. 모바일 하단 내비게이션, native dialog, 키보드 초점, 동작·투명도 줄이기와 backdrop-filter 미지원 대체 표면을 제공합니다.
 
 근거와 화면 구성 원칙은 `DESIGN.md`를 참고하세요.
+# 오픈소스 해설 개발
+
+트렌딩 상세의 가운데 해설은 `components/repository-explanation.tsx`, 공개 조회는 `/api/brief`, 소유자 전용 수집·게시는 `/mcp`에서 제공합니다. D1의 `editorial_sources`는 다음 작성을 위한 자료, `repository_briefs`는 게시한 설명과 그 설명이 사용한 자료를 보관합니다. 루트 `.openai/hosting.json`의 DB 바인딩과 `drizzle/` 마이그레이션을 유지하세요. 방문자 프로젝트 기록과는 별개입니다.
+
+런타임 `REPOFIT_EDITOR_EMAIL`은 Sites가 인증한 소유자의 이메일과 비교하는 서버 전용 설정입니다. 미설정 상태와 다른 사용자에게는 게시를 허용하지 않습니다. 예약 실행은 [EDITORIAL.md](./EDITORIAL.md)를 따릅니다. 브라우저의 소유자 세션에서도 같은 서버 도구를 WebMCP로 사용할 수 있습니다. 이 브리지는 초기 게시와 수동 재시도용이며 무인 실행은 호스팅된 MCP 연결을 사용합니다.
+
+검증: `node scripts/verify-briefs.mjs`는 SQLite에서 수집·게시·재조회, 자료 지문과 출처 제한, 갱신 실패 시 기존 근거 보존, 배치 재시도, 오래된 설명, 소유자 권한을 확인합니다. 기존 `verify-repositories.mjs`, `verify-auth.mjs`, `verify-agent.mjs`도 회귀 검사에 포함합니다.
+
