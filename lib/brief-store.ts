@@ -23,7 +23,8 @@ export const editorialInstructions = `RepoFit의 한국어 오픈소스 해설�
 
 export async function collectEditorialQueue(input: unknown = {}) {
   const parsed = editorialQueueSchema.parse(input);
-  const refreshAfter = parsed.refreshAfter ?? new Date(Date.now() - 20 * 3600000).toISOString();
+  const koreanDayStart = Math.floor((Date.now() + 9 * 3600000) / 86400000) * 86400000 - 9 * 3600000;
+  const refreshAfter = parsed.refreshAfter ?? new Date(koreanDayStart).toISOString();
   if (Date.parse(refreshAfter) > Date.now()) throw new Error('갱신 기준 시각은 현재보다 미래일 수 없습니다.');
   const snapshot = await getTrending();
   if (snapshot.stale) throw new Error('최신 트렌딩을 수집하지 못했습니다. 이전 해설을 유지합니다.');
