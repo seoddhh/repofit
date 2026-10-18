@@ -2,7 +2,7 @@ import { eq, desc, inArray } from 'drizzle-orm';
 import { getDb } from '../db';
 import { editorialSources, repositoryBriefs } from '../db/schema';
 import { getTrending } from './github-server';
-import { collectBriefEvidence, evidenceFingerprint } from './brief-evidence';
+import { collectBriefEvidence, evidenceFingerprint, evidenceContentFingerprint } from './brief-evidence';
 import { editorialQueueSchema, publishBriefSchema, type BriefResponse } from './brief-types';
 
 export async function listBriefs() {
@@ -13,7 +13,14 @@ export async function listBriefs() {
 export async function readBrief(id: string): Promise<BriefResponse> {
   const db = getDb();
   const article = await db.select().from(repositoryBriefs).where(eq(repositoryBriefs.id, id.toLowerCase())).get();
-  if (article) return { article, evidence: article.evidence, stale: Date.now() - Date.parse(article.generatedAt) > 36 * 3600000 };
+  if (article) {
+    let stale = Date.now() - Date.parse(article.generatedAt) > 36 * 3600000;
+    if (stale) {
+      const checked = await db.select().from(editorialSources).where(eq(editorialSources.id, id.toLowerCase())).get();
+      if (checked && Date.now() - Date.parse(checked.fetchedAt) <= 36 * 3600000 && await evidenceContentFingerprint(article.evidence) === await evidenceContentFingerprint(checked.evidence)) stale = false;
+    }
+    return { article, evidence: article.evidence, stale };
+  }
   const pending = await db.select().from(editorialSources).where(eq(editorialSources.id, id.toLowerCase())).get();
   const evidence = pending && Date.now() - Date.parse(pending.fetchedAt) < 86400000 ? pending.evidence : await collectBriefEvidence(id, await getTrending().catch(() => null));
   return { article: null, evidence, stale: false };
@@ -29,25 +36,28 @@ export async function collectEditorialQueue(input: unknown = {}) {
   const snapshot = await getTrending();
   if (snapshot.stale) throw new Error('최신 트렌딩을 수집하지 못했습니다. 이전 해설을 유지합니다.');
   const db = getDb();
-  const published = snapshot.repositories.length ? await db.select({ id: repositoryBriefs.id, generatedAt: repositoryBriefs.generatedAt }).from(repositoryBriefs).where(inArray(repositoryBriefs.id, snapshot.repositories.map(repo => repo.id.toLowerCase()))) : [];
-  const generatedAt = new Map(published.map(article => [article.id, article.generatedAt]));
-  const due = snapshot.repositories.filter(repo => {
-    const timestamp = generatedAt.get(repo.id.toLowerCase());
-    return !timestamp || Date.parse(timestamp) < Date.parse(refreshAfter);
-  });
+  const published = snapshot.repositories.length ? await db.select({ id: repositoryBriefs.id, evidence: repositoryBriefs.evidence }).from(repositoryBriefs).where(inArray(repositoryBriefs.id, snapshot.repositories.map(repo => repo.id.toLowerCase()))) : [];
+  const articles = new Map(published.map(article => [article.id, article]));
+  let unchangedRepositories = 0;
   const queue = [];
   const failures: { repository: string; error: string }[] = [];
-  for (const repo of due) {
+  for (const repo of snapshot.repositories) {
     if (queue.length >= 3) break;
     try {
       const cached = await db.select().from(editorialSources).where(eq(editorialSources.id, repo.id.toLowerCase())).get();
       const evidence = cached && Date.now() - Date.parse(cached.fetchedAt) < 3600000 ? cached.evidence : await collectBriefEvidence(repo.id, snapshot);
+      const article = articles.get(repo.id.toLowerCase());
+      if (article && evidence.warnings.some(warning => !article.evidence.warnings.includes(warning))) throw new Error('자료 수집이 불완전합니다. 기존 해설을 유지합니다.');
       const fingerprint = await evidenceFingerprint(evidence);
-      await db.insert(editorialSources).values({ id: repo.id.toLowerCase(), evidence, fingerprint, fetchedAt: evidence.fetchedAt }).onConflictDoUpdate({ target: editorialSources.id, set: { evidence, fingerprint, fetchedAt: evidence.fetchedAt } });
+      if (!cached || evidence !== cached.evidence || cached.fingerprint !== fingerprint) await db.insert(editorialSources).values({ id: repo.id.toLowerCase(), evidence, fingerprint, fetchedAt: evidence.fetchedAt }).onConflictDoUpdate({ target: editorialSources.id, set: { evidence, fingerprint, fetchedAt: evidence.fetchedAt } });
+      if (article && await evidenceContentFingerprint(article.evidence) === await evidenceContentFingerprint(evidence)) {
+        unchangedRepositories++;
+        continue;
+      }
       queue.push({ repository: evidence.id, fingerprint, evidence });
     } catch (error) { failures.push({ repository: repo.id, error: error instanceof Error ? error.message : '자료 수집 실패' }); }
   }
-  return { instructions: editorialInstructions, queue, failures, fetchedAt: snapshot.fetchedAt, refreshAfter, totalRepositories: snapshot.repositories.length, dueRepositories: due.length, freshRepositories: snapshot.repositories.length - due.length };
+  return { instructions: '변경 없는 레포는 검색·재작성하지 마세요. queue에 반환된 신규·자료 변경 항목만 작성하세요. 빈 큐이고 dueRepositories가 0이면 추가 조사 없이 종료하세요. refreshAfter는 호환용이며 재작성을 강제하지 않습니다. ' + editorialInstructions, queue, failures, fetchedAt: snapshot.fetchedAt, refreshAfter, changeDetection: 'source-content-v1', totalRepositories: snapshot.repositories.length, dueRepositories: snapshot.repositories.length - unchangedRepositories, freshRepositories: unchangedRepositories, unchangedRepositories };
 }
 
 export async function publishBrief(input: unknown) {

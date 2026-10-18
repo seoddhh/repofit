@@ -48,3 +48,17 @@ export async function evidenceFingerprint(evidence: BriefEvidence) {
   const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(evidence)));
   return Array.from(new Uint8Array(hash), b => b.toString(16).padStart(2, '0')).join('');
 }
+
+// Compare the substance of the sources, excluding volatile popularity and timestamps.
+// Derive this from saved evidence too, so existing briefs need no migration.
+export async function evidenceContentFingerprint(evidence: BriefEvidence) {
+  const content = {
+    id: evidence.id.toLowerCase(), description: evidence.description,
+    language: evidence.language, license: evidence.license,
+    readme: evidence.readme, readmeSha: evidence.readmeSha,
+    release: evidence.release, sources: evidence.sources.filter(source => source.url !== 'https://github.com/trending?since=daily'),
+    warnings: evidence.warnings,
+  };
+  const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(content)));
+  return Array.from(new Uint8Array(hash), b => b.toString(16).padStart(2, '0')).join('');
+}
