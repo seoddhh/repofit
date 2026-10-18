@@ -22,6 +22,10 @@ export const publishBriefSchema = z.object({
   content: briefContentSchema,
 }).strict();
 
+export const editorialQueueSchema = z.object({
+  refreshAfter: z.string().datetime({ offset: true }).optional(),
+}).strict();
+
 export type BriefContent = z.infer<typeof briefContentSchema>;
 export type BriefEvidence = {
   id: string;
