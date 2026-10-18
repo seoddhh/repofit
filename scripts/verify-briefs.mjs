@@ -92,6 +92,17 @@ try {
   assert.ok((await store.readBrief('owner/repo12')).article);
   assert.equal((await store.collectEditorialQueue()).dueRepositories, 0);
 
+  // Legacy no-argument tools refresh yesterday's articles even less than 20 hours later.
+  Date.now = () => Date.parse('2026-10-18T00:17:00.000Z');
+  sqlite.prepare('UPDATE repository_briefs SET generated_at = ?').run('2026-10-17T14:59:59.000Z');
+  const legacyQueue = await store.collectEditorialQueue();
+  assert.equal(legacyQueue.refreshAfter, '2026-10-17T15:00:00.000Z');
+  assert.equal(legacyQueue.dueRepositories, 13);
+  assert.equal(legacyQueue.queue.length, 3);
+  sqlite.prepare('UPDATE repository_briefs SET generated_at = ?').run('2026-10-17T15:00:00.000Z');
+  assert.equal((await store.collectEditorialQueue()).dueRepositories, 0);
+  Date.now = originalNow;
+
   // A scheduled run refreshes earlier articles once, even inside the 20-hour window.
   sqlite.prepare('UPDATE repository_briefs SET generated_at = ?').run(new Date(originalNow() - 10 * 60000).toISOString());
   assert.equal((await store.collectEditorialQueue()).queue.length, 0);
