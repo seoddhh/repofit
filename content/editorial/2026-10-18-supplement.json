@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "status": "local_ready_not_published",
+  "articles": [
+    {
+      "repository": "ruvnet/ruflo",
+      "content": {
+        "tagline": "코딩 에이전트의 작업 분담·기억·실행 상태를 구성하는 도구와 플러그인 모음입니다.",
+        "summary": "모델에 요청만 보내는 대신, 여러 작업을 누가 맡고 어떤 정보를 이어받을지 구성하는 실행 계층입니다. Claude Code 플러그인과 CLI·MCP 연결 방식을 제공합니다.\n\n공식 콘솔 예시는 목표를 입력해 작업 단위인 미션을 만들고 상태와 기록을 확인하는 흐름입니다. 미션 생성은 관리할 작업이 생겼다는 뜻이며 실제 코드 구현 완료와는 다릅니다. 필요한 플러그인만 도입할 수도 있고, CLI 초기화로 프로젝트 설정까지 구성할 수도 있습니다.",
+        "useCases": [
+          "작업 관리 예: 다크 모드 추가라는 목표를 미션으로 등록하고 콘솔에서 상태와 기록을 확인합니다. 결과는 추적 가능한 작업이며 완성된 기능을 자동 보증하지 않습니다.",
+          "연결 구성 예: MCP를 지원하는 클라이언트에 Ruflo 서버를 연결해 관련 도구를 호출합니다. Claude 전용 콘솔·확장 기능까지 모든 클라이언트에서 동작한다는 뜻은 아닙니다."
+        ],
+        "strengths": [
+          "작업 관리·기억·조정 기능을 목적별 플러그인으로 제공합니다.",
+          "콘솔에서 작업 상태와 실행 기록을 함께 확인하는 경로를 제공합니다."
+        ],
+        "limitations": [
+          "플러그인 설치와 전체 CLI 초기화는 변경 범위가 다릅니다. 초기화가 만드는 설정과 hooks를 먼저 확인해야 합니다.",
+          "최신 릴리스의 수정 안내만으로 기존 설치의 설정이 안전하게 변경됐다고 볼 수 없습니다. 실제 동작과 성능은 실행 검증하지 않았습니다."
+        ],
+        "gettingStarted": "공식 README의 설치 경로 비교표에서 필요한 플러그인과 전체 CLI 구성을 비교하세요. Claude 전용 기능의 버전 조건과 MCP 연결 범위를 확인한 뒤 작은 작업 하나로 상태 기록부터 검증하세요.",
+        "trendReasons": [
+          {
+            "kind": "fact",
+            "text": "2026년 10월 18일 07:38 KST 공개된 v3.57.0은 초기 Codex 설정과 로컬 MCP 요청 검증을 포함한 수정 사항을 안내합니다. 확인한 최근 변화이며 인기의 원인 자체를 입증하지는 않습니다.",
+            "sourceUrls": ["https://github.com/ruvnet/ruflo/releases/tag/v3.57.0"]
+          },
+          {
+            "kind": "fact",
+            "text": "10월 18일 14:28 KST 수집 목록에서는 일간 트렌딩 12위, 당일 스타 420개 증가로 관측됐습니다. 특정 발표에 대한 외부 반응과 유입 경로는 확인하지 못해 직접적인 주목 계기는 확정하지 않습니다.",
+            "sourceUrls": ["https://github.com/trending?since=daily"]
+          }
+        ]
+      },
+      "sources": [
+        {"title": "공식 GitHub 저장소", "url": "https://github.com/ruvnet/ruflo"},
+        {"title": "공식 README", "url": "https://github.com/ruvnet/ruflo/blob/main/README.md"},
+        {"title": "공식 릴리스 v3.57.0", "url": "https://github.com/ruvnet/ruflo/releases/tag/v3.57.0"},
+        {"title": "GitHub 오늘의 트렌딩", "url": "https://github.com/trending?since=daily"}
+      ]
+    },
+    {
+      "repository": "xerj-org/xerj",
+      "content": {
+        "tagline": "코드와 문서 폴더를 색인해 에이전트가 관련 본문과 파일 위치를 검색하도록 돕는 검색 서버입니다.",
+        "summary": "매번 파일을 열거나 문자열을 찾는 대신 폴더를 먼저 검색 가능한 자료로 정리합니다. autoindex는 파일 종류를 구분해 색인을 만들고, 검색 결과는 관련 구절과 파일·줄 위치를 제공합니다.\n\n공식 예시는 프로젝트 폴더를 색인한 뒤 특정 처리 방식에 관한 질문을 검색하는 흐름입니다. 결과로 얻은 코드 구절을 읽고 원본 위치를 확인할 수 있습니다. 앱에 추가하는 UI 스킬 하나가 아니라 별도 서버와 검색 연결을 구성하는 도구입니다.",
+        "useCases": [
+          "코드 탐색 예: 프로젝트 폴더를 색인하고 저장 로그 처리 방식을 검색합니다. 파일 이름 목록만 보는 대신 관련 본문과 줄 위치를 받아 구현을 확인합니다.",
+          "자료 검색 예: 코드와 문서가 섞인 폴더를 색인해 질문과 관련된 부분을 찾습니다. 에이전트는 검색 결과를 읽고 원본 근거를 확인하는 흐름으로 사용할 수 있습니다."
+        ],
+        "strengths": [
+          "문서와 코드 등 서로 다른 자료를 폴더 단위로 색인하는 경로를 제공합니다.",
+          "파일 위치를 포함한 검색 결과와 MCP 연결 예시를 제공합니다."
+        ],
+        "limitations": [
+          "색인 저장 공간과 서버 운영이 필요합니다. 전체 폴더를 넣기 전에 민감 자료와 제외 범위를 확인하세요.",
+          "README의 토큰·비용 절감 수치는 제작자 측 실험입니다. 여기서는 재현하지 않았고 기존 Elasticsearch 도구와의 전체 호환성도 검증하지 않았습니다."
+        ],
+        "gettingStarted": "공식 README의 폴더 색인 예시를 따라 작은 공개 자료부터 검색 결과와 파일 위치를 확인하세요. 서버 인증 설정과 색인 범위를 결정한 뒤 에이전트 연결을 검토하세요.",
+        "trendReasons": [
+          {
+            "kind": "fact",
+            "text": "10월 18일 14:28 KST 수집 목록에서 일간 트렌딩 13위, 당일 스타 1,160개 증가가 관측됐습니다. 날짜가 확인되는 관심 지표이며 증가 이유 자체는 설명하지 않습니다.",
+            "sourceUrls": ["https://github.com/trending?since=daily"]
+          },
+          {
+            "kind": "fact",
+            "text": "현재 공식 README는 폴더 자동 색인과 코드 근거 검색 예시를 제공합니다. 다만 확인한 공식 릴리스와 외부 반응만으로는 이번 관심을 촉발한 사건을 특정하지 못했습니다.",
+            "sourceUrls": ["https://github.com/xerj-org/xerj/blob/main/README.md"]
+          }
+        ]
+      },
+      "sources": [
+        {"title": "공식 GitHub 저장소", "url": "https://github.com/xerj-org/xerj"},
+        {"title": "공식 README", "url": "https://github.com/xerj-org/xerj/blob/main/README.md"},
+        {"title": "GitHub 오늘의 트렌딩", "url": "https://github.com/trending?since=daily"}
+      ]
+    }
+  ]
+}
