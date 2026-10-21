@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { Compass, FolderGit2, Clock3, ArrowUpRight, ChevronDown, LogIn, LogOut, X, GitBranch, Bot } from 'lucide-react';
+import { Compass, FolderGit2, Clock3, ArrowUpRight, ChevronDown, LogIn, LogOut, X, GitBranch, Bot, Puzzle } from 'lucide-react';
 import { DemoProvider, useDemo } from './demo-provider';
 import { WorkspaceProvider, useWorkspace } from './workspace-provider';
 import { AgentProvider } from './agent-provider';
@@ -23,6 +23,7 @@ function Shell({ children, user, localPreview }: ShellProps) {
   const { project } = useWorkspace();
   const navigation = [
     { href: '/', title: '트렌딩', icon: Compass, active: pathname === '/' || pathname.startsWith('/explore') },
+    { href: '/skills', title: '스킬', icon: Puzzle, active: pathname === '/skills' },
     { href: '/project', title: '내 프로젝트', icon: FolderGit2, active: pathname === '/project' },
     { href: '/agent', title: '내 에이전트', icon: Bot, active: pathname === '/agent' },
     { href: '/history', title: '분석 기록', icon: Clock3, active: pathname === '/history' || pathname.startsWith('/analysis') },
