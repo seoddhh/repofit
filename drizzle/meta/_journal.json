@@ -8,6 +8,20 @@
       "when": 1792256637791,
       "tag": "0000_tricky_paibok",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1792500642702,
+      "tag": "0001_shallow_medusa",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1792500938089,
+      "tag": "0002_magenta_maestro",
+      "breakpoints": true
     }
   ]
 }
