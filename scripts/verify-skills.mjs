@@ -1,0 +1,67 @@
+import assert from 'node:assert/strict';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, symlinkSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { createRequire } from 'node:module';
+import ts from 'typescript';
+
+const temporary = mkdtempSync(join(tmpdir(), 'repofit-skills-'));
+const originalFetch = globalThis.fetch; const originalNow = Date.now;
+try {
+  writeFileSync(join(temporary, 'package.json'), '{"type":"commonjs"}');
+  symlinkSync(resolve('node_modules'), join(temporary, 'node_modules')); mkdirSync(join(temporary, 'lib'));
+  const compile = (source, output, transform = value => value) => writeFileSync(join(temporary, output), ts.transpileModule(transform(readFileSync(source, 'utf8')), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText);
+  for (const name of ['skills-types', 'skills-server']) compile(`lib/${name}.ts`, `lib/${name}.js`);
+  compile('app/api/skills/route.ts', 'route.js', code => code.replaceAll('@/lib/', './lib/'));
+  const require = createRequire(import.meta.url);
+  const { searchSkills } = require(join(temporary, 'lib/skills-server.js'));
+  const { GET } = require(join(temporary, 'route.js'));
+  const skill = { id: 'vercel-labs/agent-skills/react-best-practices', name: 'react-best-practices', source: 'vercel-labs/agent-skills', installs: 1234 };
+  let requests = 0;
+  globalThis.fetch = async (url, options) => {
+    requests++;
+    assert.equal(url.origin, 'https://skills.sh');
+    assert.equal(url.pathname, '/api/search');
+    assert.equal(url.searchParams.get('limit'), '20');
+    assert.equal(options.redirect, 'manual');
+    assert.ok(!options.headers.Authorization);
+    return Response.json({ skills: [skill, skill], query: url.searchParams.get('q') });
+  };
+  const concurrent = await Promise.all([searchSkills('react'), searchSkills('react')]);
+  assert.equal(requests, 1); assert.deepEqual(concurrent[0], concurrent[1]);
+  assert.equal(concurrent[0].skills.length, 1);
+  assert.equal(concurrent[0].skills[0].repositoryUrl, 'https://github.com/vercel-labs/agent-skills');
+  assert.equal(concurrent[0].skills[0].url, 'https://skills.sh/vercel-labs/agent-skills/react-best-practices');
+  await searchSkills('react'); assert.equal(requests, 1);
+  await searchSkills('react & owner=evil');
+  await assert.rejects(() => searchSkills('a'));
+  assert.equal((await GET(new Request('https://repofit.example/api/skills?q=a'))).status, 400);
+  globalThis.fetch = async () => Response.json({ skills: [{ ...skill, id: 'vercel-labs/../secret' }] });
+  await assert.rejects(() => searchSkills('invalid-path'), /출처 형식/);
+  globalThis.fetch = async () => Response.json({ skills: [{ ...skill, installs: -1 }] });
+  await assert.rejects(() => searchSkills('invalid-count'), /응답 형식/);
+  globalThis.fetch = async () => Response.json({ skills: [] });
+  assert.equal((await searchSkills('empty')).skills.length, 0);
+  globalThis.fetch = async () => Response.json({ skills: [{ id: 'mintlify.com/mintlify', name: 'mintlify', source: 'mintlify.com', installs: 2 }] });
+  assert.equal((await searchSkills('well-known')).skills[0].repositoryUrl, null);
+  globalThis.fetch = async () => Response.json({ error: 'rate_limited' }, { status: 429, headers: { 'Retry-After': '25' } });
+  const rateLimited = await GET(new Request('https://repofit.example/api/skills?q=rate-limited'));
+  assert.equal(rateLimited.status, 429); assert.equal(rateLimited.headers.get('retry-after'), '25');
+  Date.now = () => originalNow() + 61000;
+  assert.equal((await searchSkills('react')).stale, true);
+  Date.now = () => originalNow() + 3600001;
+  await assert.rejects(() => searchSkills('react'), /한도/);
+  Date.now = originalNow;
+  globalThis.fetch = async () => new Response('x'.repeat(262145));
+  await assert.rejects(() => searchSkills('oversized'), /한도/);
+  globalThis.fetch = async () => new Response('', { status: 401 });
+  await assert.rejects(() => searchSkills('auth-required'), /공개 검색 접근/);
+  const shell = readFileSync('components/app-shell.tsx', 'utf8');
+  assert.ok(shell.includes("href: '/skills'"));
+  assert.ok(shell.includes("href: '/'"));
+  assert.ok(!readFileSync('lib/github-server.ts', 'utf8').includes('skills.sh'));
+  console.log('통과: 공개 검색 API·캐시·동시 요청 공유·출처 검증·빈 결과·요청 제한·이전 자료·크기 제한·트렌딩 유지');
+} finally {
+  globalThis.fetch = originalFetch; Date.now = originalNow;
+  rmSync(temporary, { recursive: true, force: true });
+}

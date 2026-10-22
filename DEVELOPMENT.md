@@ -84,3 +84,7 @@ Sites Dispatch가 `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`�
 런타임 `REPOFIT_EDITOR_EMAIL`은 Sites가 인증한 소유자의 이메일과 비교하는 서버 전용 설정입니다. 미설정 상태와 다른 사용자에게는 게시를 허용하지 않습니다. 예약 실행은 [EDITORIAL.md](./EDITORIAL.md)를 따릅니다. 브라우저의 소유자 세션에서도 같은 서버 도구를 WebMCP로 사용할 수 있습니다. 이 브리지는 초기 게시와 수동 재시도용이며 무인 실행은 호스팅된 MCP 연결을 사용합니다.
 
 검증: `node scripts/verify-briefs.mjs`는 SQLite에서 수집·게시·재조회, 자료 지문과 출처 제한, 갱신 실패 시 기존 근거 보존, 배치 재시도, 오래된 설명, 소유자 권한을 확인합니다. 기존 `verify-repositories.mjs`, `verify-auth.mjs`, `verify-agent.mjs`도 회귀 검사에 포함합니다.
+
+## 스킬 검색 탭
+
+`/skills`는 skills.sh 공개 검색 API를 사용하는 에이전트용 스킬 탐색 화면입니다. 기존 GitHub Trending은 유지합니다. API 선택 근거와 한계는 [연동 문서](docs/SKILLS_API_INTEGRATION.md), 검증은 `node scripts/verify-skills.mjs`를 참고하세요.
