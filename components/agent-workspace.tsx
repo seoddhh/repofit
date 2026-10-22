@@ -7,6 +7,7 @@ import { projectLabel, taskLabel, resultMarkdown, taskPrompt, taskStatusLabels, 
 import { repositoryId } from '@/lib/repository-types';
 import { useAgentWorkspace } from './agent-provider';
 import { useWorkspace } from './workspace-provider';
+import { LocalAgentInventory } from './local-agent-inventory';
 
 export function downloadText(name: string, text: string, type = 'text/plain;charset=utf-8') {
   const url = URL.createObjectURL(new Blob([text], { type }));
@@ -56,6 +57,7 @@ export function AgentWorkspace({ initialCandidate, initialTaskId, purpose = 'ski
   const connectionLabel = { checking: '페이지 도구 확인 중', available: '페이지 도구 사용 가능', unsupported: '이 브라우저는 페이지 도구를 지원하지 않습니다', error: '페이지 도구를 등록하지 못했습니다' }[connection];
   return <>
     <div className="page-heading"><div><h1>{skillsMode ? '내 에이전트' : '프로젝트 검토'}</h1><p>{skillsMode ? '에이전트에 추가할 스킬을 찾고 활용 방법을 살펴보세요.' : '프로젝트와 오픈소스를 비교하고 적용할 위치를 살펴보세요.'}</p></div><a className="secondary-button" href="/skills/repofit-review/SKILL.md" download="SKILL.md"><Download size={16}/> RepoFit 스킬</a></div>
+    {skillsMode && <LocalAgentInventory/>}
     {missingRequest && <div className="inline-notice" role="status"><CircleAlert size={17}/><p>이 탭에서 해당 요청을 찾지 못했습니다. 요청과 결과는 새로고침 후 복원되지 않습니다. 새 검토 요청을 만들어 주세요.</p></div>}
     <div className="agent-layout"><div className="agent-main">
       <section className="surface agent-request" aria-labelledby="agent-request-title"><div className="section-heading"><div><h2 id="agent-request-title">{skillsMode ? '스킬 탐색 설정' : '검토 설정'}</h2></div><GitBranch size={20}/></div>
