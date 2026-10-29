@@ -1,6 +1,6 @@
-import { and, desc, eq, gt, isNull } from 'drizzle-orm';
+import { and, desc, eq, gt, isNull, inArray } from 'drizzle-orm';
 import { getDb } from '../db';
-import { localAgentDevices as devices } from '../db/schema';
+import { localAgentDevices as devices, agentCoachReports } from '../db/schema';
 import { localInventorySchema, pairingClaimSchema, type LocalDevice } from './local-agent-types';
 
 export class LocalAgentError extends Error {
@@ -52,4 +52,5 @@ export async function receiveLocalInventory(token: string, input: unknown) {
 export async function removeLocalDevice(userId: string, id: string) {
   const rows = await getDb().delete(devices).where(and(eq(devices.id, id), eq(devices.userId, userId))).returning({ id: devices.id });
   if (!rows[0]) throw new LocalAgentError('연결된 기기를 찾지 못했습니다.', 404);
+  await getDb().update(agentCoachReports).set({ status: 'canceled', leaseHash: null, leaseExpiresAt: null, message: '기기 연결을 해제했습니다.', updatedAt: new Date().toISOString() }).where(and(eq(agentCoachReports.userId, userId), eq(agentCoachReports.deviceId, id), inArray(agentCoachReports.status, ['queued', 'running'])));
 }

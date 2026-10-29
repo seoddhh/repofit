@@ -22,6 +22,27 @@
       "when": 1792500938089,
       "tag": "0002_magenta_maestro",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1793085437744,
+      "tag": "0003_agent_coach",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1793085680649,
+      "tag": "0004_agent_activity",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1793086452006,
+      "tag": "0005_activity_integrity",
+      "breakpoints": true
     }
   ]
 }
