@@ -51,7 +51,7 @@ export type RepositoryBrief = {
 };
 export type BriefResponse = {
   article: RepositoryBrief | null;
-  evidence: BriefEvidence;
+  evidence: BriefEvidence | null;
   stale: boolean;
 };
 

@@ -36,6 +36,7 @@ export function RepositoryExplanation({ repository, embedded = false }: { reposi
     {!embedded && <Link href="/" className="text-button explanation-back"><ArrowLeft size={15}/> 트렌딩 목록</Link>}
     {!data && !error && <div className="explanation-loading" role="status"><RefreshCw size={22} className="spin"/><p>공식 자료와 해설을 불러오고 있어요.</p></div>}
     {error && <div className="inline-notice warning" role="alert"><CircleAlert size={18}/><div><p>{error}</p><button className="text-button" onClick={() => { setError(''); setAttempt(n => n + 1); }}>다시 시도 <RefreshCw size={14}/></button></div></div>}
+    {data && !evidence && <div className="explanation-pending"><BookOpen size={22}/><div><h2>해설을 준비하고 있어요.</h2><p>아직 저장된 자료가 없습니다. 새 자료가 확인되면 이곳에 반영됩니다.</p><a className="text-button" href={`https://github.com/${repository}`} target="_blank" rel="noreferrer">GitHub 원본 살펴보기 <ArrowUpRight size={14}/></a></div></div>}
     {evidence && <article className={`explanation-page ${embedded ? 'embedded' : ''}`}>
       <header className="explanation-hero">
         <div className="explanation-eyebrow"><span className="explanation-label"><BookOpen size={14}/> 오픈소스 해설</span>{evidence.trending && <span>GitHub Trending #{evidence.trending.rank}, 수집 시점 기준</span>}</div>
@@ -47,7 +48,7 @@ export function RepositoryExplanation({ repository, embedded = false }: { reposi
       </header>
       <div className="explanation-update"><Clock3 size={14}/><span>{article ? `${checkedAt(article.generatedAt)} KST 해설 갱신` : `${checkedAt(evidence.fetchedAt)} KST 자료 확인`}</span><span className="explanation-update-label">{article ? 'AI가 공식 자료를 읽고 정리한 해설' : '공식 자료'}</span></div>
       {data.stale && <p className="explanation-notice"><CircleAlert size={15}/> 최근 갱신이 지연되어 이전 해설을 표시합니다. 최신 내용은 원본에서 확인해 주세요.</p>}
-      {!article && <div className="explanation-pending"><BookOpen size={20}/><div><h2>쉬운 한국어 해설을 준비하고 있어요.</h2><p>자동 정리는 오늘의 상위 10개를 대상으로 합니다. 아직 해설이 없는 레포는 확인한 공식 자료를 먼저 보여드립니다.</p></div></div>}
+      {!article && <div className="explanation-pending"><BookOpen size={20}/><div><h2>쉬운 한국어 해설을 준비하고 있어요.</h2><p>아직 해설이 없는 레포는 저장된 공식 자료를 먼저 보여드립니다.</p></div></div>}
       <div className="explanation-section-tabs" role="tablist" aria-label="오픈소스 해설 내용">{[{ id: 'overview', label: '어떤 도구인가요?' }, { id: 'trending', label: '왜 주목받나요?' }, { id: 'sources', label: '출처와 시작하기' }].map((item, index, items) => <button key={item.id} id={`tab-${item.id}`} type="button" role="tab" aria-selected={section === item.id} aria-controls={`panel-${item.id}`} tabIndex={section === item.id ? 0 : -1} onClick={() => setSection(item.id)} onKeyDown={event => {
         if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
         event.preventDefault();
@@ -88,7 +89,7 @@ export function ExplanationLibrary() {
     }).catch(error => { if (!controller.signal.aborted) setError(error.message); });
     return () => controller.abort();
   }, [attempt]);
-  return <><Link href="/" className="text-button explanation-back"><ArrowLeft size={15}/> 트렌딩 목록</Link><div className="page-heading"><div><h1>오픈소스, 쉽게 이해하기</h1><p>무엇을 하는 도구인지, 왜 주목받는지. 공식 자료를 읽고 한국어로 정리했어요.</p></div></div><div className="explanation-library-note"><RefreshCw size={15}/><p>오늘의 트렌딩 상위 10개를 자동 정리합니다. 각 해설에 확인한 출처와 갱신 시각을 표시합니다.</p></div>
+  return <><Link href="/" className="text-button explanation-back"><ArrowLeft size={15}/> 트렌딩 목록</Link><div className="page-heading"><div><h1>오픈소스, 쉽게 이해하기</h1><p>무엇을 하는 도구인지, 왜 주목받는지. 공식 자료를 읽고 한국어로 정리했어요.</p></div></div><div className="explanation-library-note"><RefreshCw size={15}/><p>새로 확인되거나 자료가 달라진 트렌딩을 자동 정리합니다. 각 해설에 확인한 출처와 갱신 시각을 표시합니다.</p></div>
     {error && <div className="inline-notice warning" role="alert"><CircleAlert size={18}/><div><p>{error}</p><button className="text-button" onClick={() => { setError(''); setAttempt(n => n + 1); }}>다시 시도 <RefreshCw size={14}/></button></div></div>}
     {!articles && !error && <div className="explanation-loading" role="status"><RefreshCw size={22} className="spin"/>해설 목록을 불러오고 있어요.</div>}
     {articles && articles.length > 0 && <div className="explanation-library">{articles.map(item => <Link href={explanationPath(item.id)} className="explanation-library-item" key={item.id}><div><span className="explanation-label">{item.rank ? `수집 당시 Trending #${item.rank}` : '오픈소스 해설'}</span><BookOpen size={19}/></div><p>{item.id.split('/')[0]}</p><h2>{item.id.split('/')[1]}</h2><p className="explanation-library-tagline">{uiText(item.tagline)}</p><footer><span>{item.language ?? '언어 미표시'}</span><span>자세히 읽기 <ArrowRight size={14}/></span></footer><small>{checkedAt(item.generatedAt)} KST 갱신</small></Link>)}</div>}
