@@ -20,7 +20,7 @@ export function EditorialBridge() {
           if (lifecycle.signal.aborted) return;
           await registry!.registerTool({
             ...tool, name: `repofit_editorial_${tool.name}`,
-            annotations: { readOnlyHint: tool.name === 'read_repository_brief', untrustedContentHint: true },
+            annotations: { readOnlyHint: ['read_repository_brief', 'read_skill_catalog'].includes(tool.name), untrustedContentHint: true },
             async execute(input) {
               const result = await rpc('tools/call', { name: tool.name, arguments: input });
               if (tool.name === 'publish_repository_brief' && !result.result?.isError && !result.error) window.dispatchEvent(new Event('repofit-brief-updated'));

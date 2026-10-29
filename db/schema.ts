@@ -3,6 +3,16 @@ import type { BriefContent, BriefEvidence } from '../lib/brief-types';
 import type { LocalInventory } from '../lib/local-agent-types';
 import type { ActivitySummary, CoachBundle, CoachNarrative, CoachReport } from '../lib/coach-types';
 
+export const skillCatalogState = sqliteTable('skill_catalog_state', {
+  id: text('id').primaryKey(), data: text('data', { mode: 'json' }).$type<unknown>().notNull(), updatedAt: text('updated_at').notNull(),
+});
+export const skillCatalogItems = sqliteTable('skill_catalog_items', {
+  id: text('id').primaryKey(), data: text('data', { mode: 'json' }).$type<unknown>().notNull(),
+});
+export const skillCatalogSources = sqliteTable('skill_catalog_sources', {
+  id: text('id').primaryKey(), data: text('data', { mode: 'json' }).$type<unknown>().notNull(),
+});
+
 export const editorialSources = sqliteTable('editorial_sources', {
   id: text('id').primaryKey(),
   fingerprint: text('fingerprint').notNull(),
