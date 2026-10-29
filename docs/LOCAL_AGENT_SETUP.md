@@ -1,6 +1,8 @@
 # Mac의 스킬 목록 연결
 
-첫 구현 범위는 **프로젝트 한 개의 Codex·Claude Code 스킬 목록 조회와 사이트 표시**다. 분석, 설치, 기존 에이전트 대화 조작, 사용 이력 수집은 포함하지 않는다.
+> 2026-10-27: 프로젝트 없는 개인 연결과 활용 보고서를 추가했습니다. 새 기본 사용법은 [활용 보고서 구현·실행 안내](./AGENT_COACH_IMPLEMENTATION.md)를 참고하세요. 아래는 기존 프로젝트 문맥의 목록 조회 사용법입니다.
+
+기존 프로젝트 목록 기능의 범위는 **프로젝트 한 개의 Codex·Claude Code 스킬 목록 조회와 사이트 표시**다. 새 개인 진단·선택 사례·분석 실행의 범위는 위 구현 안내에서 구분한다.
 
 ## 로컬에서 사용
 
@@ -15,7 +17,7 @@ Node.js 22.13 이상과 RepoFit 소스가 필요하다. 별도 연결 패키지�
    ```
 
 3. `npm run dev`로 서버를 실행하고 `/agent`에서 로컬 테스트 로그인한다.
-4. **Mac 연결**을 눌러 일회용 코드를 만든다. 조회할 프로젝트의 절대 경로를 입력한다.
+4. **Mac 연결**을 눌러 일회용 코드를 만든다. 기본 개인 연결에는 프로젝트 입력이 없다. 이 문서의 프로젝트 문맥을 조회하려면 아래 CLI의 --project 옵션을 사용한다.
 5. RepoFit 소스 폴더의 터미널에서 화면의 명령을 실행한다. 예:
 
    ```sh
@@ -39,7 +41,7 @@ npm run local-agent -- --project /Users/me/Desktop/my-project --inspect
 웹 코드와 D1 마이그레이션을 함께 배포한다. 운영 사이트의 `/agent`에서 **Mac 연결**을 눌러 코드를 만들고 화면의 사이트 주소를 사용해 로컬 프로그램을 실행한다. 사이트는 기존 방문자 인증을 유지하고, 기기 전송은 사이트 로그인 쿠키 대신 연결 코드로 교환한 기기 토큰을 사용한다.
 
 ```sh
-npm run local-agent -- --site https://repofit.fizzybean4.chatgpt.site --project /Users/me/Desktop/my-project
+npm run local-agent -- --site https://repofit.example --project /Users/me/Desktop/my-project
 ```
 
 소유자 전용 Sites는 Dispatch가 앱의 기기 토큰을 검사하기 전에 서비스 접근 인증을 요구할 수 있다. 해당 사이트의 지원되는 서비스 접근 토큰을 사용자 로컬 환경변수에 두고 `--service-token-env REPOFIT_SITE_ACCESS_TOKEN`을 추가한다. 연결 프로그램은 이를 같은 사이트에만 `OAI-Sites-Authorization` 헤더로 전달한다. 토큰을 코드·DB·명령 인자·공유 문서에 넣지 않는다. 이 기능을 위해 사이트를 공개로 전환하지 않는다. 멀티 사용자 운영에 서비스 접근 경로를 제공할 수 없다면 별도 기기 API의 호스팅을 먼저 결정해야 한다. 운영 Dispatch 인증은 로컬 테스트 로그인으로 검증할 수 없다.

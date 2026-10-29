@@ -31,7 +31,7 @@ export async function collectBriefEvidence(id: string, snapshot: TrendingSnapsho
     name: latest.name || latest.tag_name, publishedAt: latest.published_at,
     body: (latest.body ?? '').slice(0, 12000), url: latest.html_url,
   } : null;
-  if (release) sources.push({ title: `공식 릴리스 · ${release.name}`, url: release.url });
+  if (release) sources.push({ title: `공식 릴리스, ${release.name}`, url: release.url });
   if (releaseResult.status === 'rejected') warnings.push('릴리스 자료를 확인하지 못했습니다.');
   const trending = snapshot?.repositories.find(r => r.id.toLowerCase() === metadata.full_name.toLowerCase()) ?? null;
   if (trending) sources.push({ title: 'GitHub 오늘의 트렌딩', url: snapshot!.sourceUrl });

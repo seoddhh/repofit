@@ -1,0 +1,202 @@
+{
+  "type": "object",
+  "properties": {
+    "summary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1600
+    },
+    "dimensions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "axis": {
+            "type": "string",
+            "enum": [
+              "goal",
+              "context",
+              "steps",
+              "validation",
+              "reuse"
+            ]
+          },
+          "finding": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1600
+          },
+          "evidenceIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "minItems": 1,
+            "maxItems": 10
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium"
+            ]
+          }
+        },
+        "required": [
+          "axis",
+          "finding",
+          "evidenceIds",
+          "confidence"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 5,
+      "maxItems": 5
+    },
+    "habits": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1600
+          },
+          "examplePrompt": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1600
+          },
+          "evidenceIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "minItems": 1,
+            "maxItems": 10
+          }
+        },
+        "required": [
+          "action",
+          "examplePrompt",
+          "evidenceIds"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 1,
+      "maxItems": 3
+    },
+    "recommendations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "catalogSkillId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 600
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1600
+          },
+          "evidenceIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "minItems": 1,
+            "maxItems": 10
+          },
+          "prerequisites": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1600
+            },
+            "minItems": 1,
+            "maxItems": 6
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1600
+            },
+            "minItems": 1,
+            "maxItems": 8
+          },
+          "examplePrompt": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1600
+          },
+          "expectedBenefits": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1600
+            },
+            "minItems": 1,
+            "maxItems": 5
+          },
+          "exercise": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1600
+          },
+          "checks": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1600
+            },
+            "minItems": 1,
+            "maxItems": 5
+          }
+        },
+        "required": [
+          "catalogSkillId",
+          "reason",
+          "evidenceIds",
+          "prerequisites",
+          "steps",
+          "examplePrompt",
+          "expectedBenefits",
+          "exercise",
+          "checks"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 0,
+      "maxItems": 3
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1600
+      },
+      "minItems": 1,
+      "maxItems": 10
+    }
+  },
+  "required": [
+    "summary",
+    "dimensions",
+    "habits",
+    "recommendations",
+    "limitations"
+  ],
+  "additionalProperties": false
+}

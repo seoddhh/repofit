@@ -887,3 +887,73 @@ dialog::backdrop { background: rgba(31,43,65,.19); -webkit-backdrop-filter: blur
   .primary-button, .secondary-button, .invitation-action, .sidebar-add, .sidebar-repo, .login-button, .nav-item.active, .mobile-nav > a.active { background: #daeaff; color: #163e6c; border-color: #6e8eae; }
 }
 @supports not (backdrop-filter: blur(1px)) { .sidebar, .topbar, .mobile-nav, .detail-dialog, .center-dialog, .account-popover, .toast, .list-toolbar { background: #f8f9fc; } }
+
+.coach-intro { display: flex; align-items: center; gap: 17px; padding: 23px 26px; margin-bottom: 14px; }
+.coach-intro > svg { color: var(--accent); }
+.coach-intro p, .coach-byline { color: var(--muted); font-size: 12px; margin-top: 5px; }
+.coach-connection { margin: 0 0 24px; }
+.coach-connection > summary { padding: 12px 2px; cursor: pointer; color: var(--accent); font-size: 13px; }
+.coach-connection .local-inventory { margin-top: 10px; }
+.coach-tabs { display: flex; flex-wrap: wrap; gap: 6px; border-bottom: 1px solid var(--line); margin-bottom: 26px; }
+.coach-tabs button { padding: 12px 17px; border-bottom: 2px solid transparent; color: var(--muted); font-size: 13px; }
+.coach-tabs button.selected { color: var(--accent); border-color: var(--accent); font-weight: 600; }
+.coach-tabs span { display: inline-block; margin-left: 7px; font-size: 11px; }
+.coach-error { margin-bottom: 18px; }
+.coach-form { min-width: 0; }
+.coach-form fieldset { border: 0; padding: 0; margin: 0 0 26px; min-width: 0; }
+.coach-work label { display: inline-flex; align-items: center; gap: 7px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px; margin: 4px 7px 4px 0; cursor: pointer; font-size: 12px; }
+.coach-work label.selected { background: var(--accent-soft); color: var(--accent); }
+.coach-form .coach-assessment { margin-top: 27px; }
+.coach-assessment label { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 13px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
+.coach-assessment select, .coach-feedback select { background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 8px; font-size: 12px; min-width: 145px; }
+.coach-consent { display: flex; align-items: flex-start; gap: 9px; font-size: 12px; color: var(--muted); line-height: 1.8; margin: 18px 0; }
+.coach-consent input { margin-top: 5px; flex-shrink: 0; }
+.coach-run { padding: 26px; margin-bottom: 20px; }
+.coach-run > p { margin: 12px 0; color: var(--muted); font-size: 12px; }
+.coach-run h2 { font-size: 19px; margin-top: 7px; }
+.coach-report { background: var(--surface); }
+.coach-dimensions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; margin: 16px 0 28px; }
+.coach-dimensions > div { padding: 18px 0; border-bottom: 1px solid var(--line); }
+.coach-dimensions strong { font-size: 12px; }
+.coach-dimensions p { color: var(--muted); font-size: 12px; margin: 8px 0; }
+.coach-dimensions small { font-size: 10px; color: var(--muted); overflow-wrap: anywhere; }
+.coach-habit { margin: 16px 0; font-size: 13px; }
+.coach-prompt { background: var(--accent-soft); border-radius: 12px; padding: 15px; margin-top: 12px; }
+.coach-prompt p { font-size: 12px; line-height: 1.8; white-space: pre-wrap; overflow-wrap: anywhere; }
+.coach-prompt button { margin-top: 10px; }
+.coach-recommendation { border-top: 1px solid var(--line); padding: 25px 0; margin-top: 20px; }
+.coach-recommendation > p { font-size: 13px; margin: 12px 0; }
+.coach-recommendation h3 a { color: var(--accent); }
+.coach-badge { font-size: 10px; border-radius: 99px; padding: 5px 9px; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
+.coach-guide { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 26px; margin-top: 22px; }
+.coach-guide h4 { font-size: 12px; margin: 12px 0; }
+.coach-guide p, .coach-guide li { font-size: 12px; color: var(--muted); line-height: 1.9; overflow-wrap: anywhere; }
+.coach-guide ul, .coach-guide ol { padding-left: 19px; }
+.coach-method { border-top: 1px solid var(--line); padding: 17px 0; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.coach-method summary { cursor: pointer; color: var(--text); }
+.coach-method p, .coach-method > div { margin-top: 15px; }
+.coach-method li { margin: 7px 0; }
+.coach-feedback { display: grid; gap: 11px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 12px; }
+.coach-feedback label { display: flex; align-items: center; gap: 14px; }
+.coach-feedback textarea { width: 100%; resize: vertical; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--text); padding: 11px; font-size: 12px; }
+.coach-feedback button { justify-self: start; }
+.coach-history { padding: 27px; }
+.coach-history h2 { font-size: 18px; }
+.coach-history-row { display: flex; align-items: center; gap: 16px; border-top: 1px solid var(--line); margin-top: 18px; padding-top: 18px; }
+.coach-history-row > button:first-child { flex: 1; text-align: left; min-width: 0; }
+.coach-history-row span { display: block; color: var(--muted); font-size: 11px; margin: 5px 0; }
+.coach-history-row p { font-size: 12px; overflow-wrap: anywhere; }
+.coach-empty { padding: 22px 0; color: var(--muted); font-size: 13px; }
+@media (max-width: 700px) {
+  .coach-dimensions, .coach-guide { grid-template-columns: minmax(0, 1fr); }
+  .coach-assessment label { align-items: flex-start; flex-direction: column; gap: 10px; }
+  .coach-assessment select { width: 100%; }
+  .coach-run > .section-heading, .coach-recommendation > .section-heading { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .coach-intro, .coach-run, .coach-history { padding: 20px; }
+  .coach-tabs button { padding: 12px 9px; font-size: 12px; }
+}
+
+/* Keep wheel and touch scrolling inside repository details at their edges. */
+.detail-dialog, .trending-explanation, .trending-side, .explanation-readme pre {
+  overscroll-behavior: contain;
+}

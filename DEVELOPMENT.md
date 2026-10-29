@@ -89,3 +89,11 @@ Sites Dispatch가 `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`�
 ## 스킬 검색 탭
 
 `/skills`는 skills.sh 공개 검색 API를 사용하는 에이전트용 스킬 탐색 화면입니다. 기존 GitHub Trending은 유지합니다. API 선택 근거와 한계는 [연동 문서](docs/SKILLS_API_INTEGRATION.md), 검증은 `node scripts/verify-skills.mjs`를 참고하세요.
+
+## 트렌딩 조회 캐시
+
+브라우저는 `/api/trending`으로 조회하고 서버는 GitHub Trending HTML을 수집합니다. REST 저장소 API와는 별도 경로입니다. 기존 화면은 진입할 때마다 API를 호출하고 응답도 `no-store`였지만 서버 내부에서는 이미 수집 결과를 5분간 재사용했습니다.
+
+현재는 브라우저에서도 원래 수집 시각부터 5분 동안 결과를 재사용하고 진행 중인 요청을 공유합니다. 화면을 오가거나 개발 모드에서 effect가 다시 실행돼도 유효한 결과를 다시 요청하지 않습니다. 정상 API 응답에는 남은 시간만큼 `private, max-age`를 적용하고 오류와 이전 자료 응답은 HTTP 캐시하지 않습니다. 명시적인 새로고침은 브라우저 캐시를 우회해 서버 결과를 조회합니다. 서버의 원본 수집 정책은 그대로 5분입니다.
+
+서버 캐시는 인스턴스 메모리에 있으므로 서버 재시작이나 다른 Worker 인스턴스 사이에서는 공유되지 않습니다. 여러 사용자 전체의 GitHub 수집을 5분에 한 번으로 제한하는 영속 캐시는 아닙니다. `node scripts/verify-ui-behavior.mjs`에서 요청 공유, 만료, 수동 새로고침과 HTTP 잔여 시간을 확인합니다.

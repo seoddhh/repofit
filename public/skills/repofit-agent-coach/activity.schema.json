@@ -1,0 +1,76 @@
+{
+  "type": "object",
+  "properties": {
+    "work": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "coding",
+          "debugging",
+          "review",
+          "documents",
+          "design",
+          "research"
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 3
+    },
+    "findings": {
+      "type": "array",
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "properties": {
+          "axis": {
+            "type": "string",
+            "enum": [
+              "goal",
+              "context",
+              "steps",
+              "validation",
+              "reuse"
+            ]
+          },
+          "finding": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1600
+          },
+          "sourceIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^item-[0-9]+$"
+            },
+            "minItems": 1,
+            "maxItems": 10
+          }
+        },
+        "required": [
+          "axis",
+          "finding",
+          "sourceIds"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1600
+      },
+      "minItems": 1,
+      "maxItems": 8
+    }
+  },
+  "required": [
+    "work",
+    "findings",
+    "limitations"
+  ],
+  "additionalProperties": false
+}

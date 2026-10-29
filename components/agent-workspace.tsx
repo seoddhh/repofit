@@ -1,4 +1,5 @@
 'use client';
+import { uiText } from '@/lib/ui-copy';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { ArrowRight, ArrowUpRight, Bot, Check, CircleAlert, Clipboard, Download, FileText, GitBranch, LoaderCircle, PlugZap, X } from 'lucide-react';
@@ -80,7 +81,7 @@ export function AgentWorkspace({ initialCandidate, initialTaskId, purpose = 'ski
       <section className="surface agent-handoff" aria-labelledby="agent-handoff-title"><div className="section-heading"><div><h2 id="agent-handoff-title">에이전트에 요청하기</h2></div><PlugZap size={20}/></div>
         {task ? <>
           <div className="agent-task-header"><div><strong>{taskLabel(task)}</strong><p>{projectLabel(task)}</p></div><span className={`agent-task-status ${task.status}`}>{taskStatusLabels[task.status]}</span></div>
-          <div className="agent-progress" role="status">{task.status === 'running' ? <LoaderCircle size={17} className="spin"/> : <Bot size={17}/>}<span>{task.message}</span></div>
+          <div className="agent-progress" role="status">{task.status === 'running' ? <LoaderCircle size={17} className="spin"/> : <Bot size={17}/>}<span>{uiText(task.message)}</span></div>
           {task.status === 'queued' && <p className="agent-help">요청을 복사해 에이전트 대화에 보내세요. 이 페이지를 열어 두면 진행 상황과 결과를 받을 수 있습니다.</p>}
           <div className="agent-actions"><button className="primary-button" type="button" onClick={() => void copyPrompt()}><Clipboard size={15}/> 실행 요청 복사</button><button className="secondary-button" type="button" onClick={() => downloadText(`repofit-request-${task.id}.txt`, taskPrompt(task, window.location.origin))}><Download size={15}/> 요청 다운로드</button>{['queued', 'running'].includes(task.status) && <button className="text-button" type="button" onClick={() => cancelTask(task.id)}><X size={15}/> 요청 취소</button>}</div>
           {notice && <p className="agent-notice" role="status">{notice}</p>}
@@ -102,21 +103,21 @@ export function AgentReport({ task }: { task: AgentTask }) {
   const result = task.result;
   if (!result) return null;
   return <section className="surface agent-report" aria-labelledby="agent-report-title"><div className="section-heading"><div><h2 id="agent-report-title">{taskLabel(task)}</h2></div><button className="icon-button" aria-label="에이전트 검토 Markdown 다운로드" onClick={() => downloadText(`repofit-review-${task.id}.md`, resultMarkdown(task), 'text/markdown;charset=utf-8')}><Download size={18}/></button></div>
-    <span className={`agent-verdict ${result.verdict}`}>{verdictLabels[result.verdict]}</span><p className="agent-report-summary">{result.summary}</p><p className="field-hint">{result.agent}가 작성한 결과입니다. 사이트에서 별도로 검증하지 않았습니다.</p>
+    <span className={`agent-verdict ${result.verdict}`}>{verdictLabels[result.verdict]}</span><p className="agent-report-summary">{uiText(result.summary)}</p><p className="field-hint">{result.agent}가 작성한 결과입니다. 사이트에서 별도로 검증하지 않았습니다.</p>
     {result.skillFit && <>
-      <div className="integration-section"><h3>도입할 만한 오픈소스 스킬</h3>{result.skillFit.recommendations.length ? result.skillFit.recommendations.map((item, index) => <a className="evidence-link" key={index} href={`https://github.com/${item.repository}`} target="_blank" rel="noreferrer"><Bot size={17}/><div><strong>{item.skill}</strong><small>{item.repository}</small><p>{item.benefit}</p></div><ArrowUpRight size={15}/></a>) : <p>근거를 갖춰 추천할 스킬을 찾지 못했습니다.</p>}</div>
+      <div className="integration-section"><h3>도입할 만한 오픈소스 스킬</h3>{result.skillFit.recommendations.length ? result.skillFit.recommendations.map((item, index) => <a className="evidence-link" key={index} href={`https://github.com/${item.repository}`} target="_blank" rel="noreferrer"><Bot size={17}/><div><strong>{item.skill}</strong><small>{item.repository}</small><p>{uiText(item.benefit)}</p></div><ArrowUpRight size={15}/></a>) : <p>근거를 갖춰 추천할 스킬을 찾지 못했습니다.</p>}</div>
       <ReportList title="새로 할 수 있는 일과 활용 예시" items={result.skillFit.addedCapabilities}/>
       <div className="agent-report-columns"><ReportList title="기존 스킬과 비교" items={result.skillFit.overlaps}/><ReportList title="충돌 가능성과 제약" items={result.skillFit.conflicts}/></div>
       <ReportList title="내 에이전트에 추가하는 방법" items={result.skillFit.integrationSteps}/>
     </>}
     <ReportList title="판단 근거" items={result.reasons}/>
     <div className="agent-report-columns"><ReportList title="기대 효과" items={result.benefits}/><ReportList title="도입 부담과 주의점" items={result.risks}/></div>
-    <div className="integration-section"><h3>{task.purpose === 'skills' ? '스킬 구성 변경 제안' : '어디를 바꾸면 좋을까요?'}</h3>{result.changes.length ? <ul className="path-candidates">{result.changes.map((change, index) => <li key={index}><FileText size={17}/><div><code>{change.path}</code><span>{change.proposal}</span></div></li>)}</ul> : <p>구체적인 파일 변경 제안이 없습니다.</p>}</div>
-    <div className="integration-section"><h3>검증 보고</h3><p>아래 상태는 에이전트의 보고입니다. 이 사이트에서 코드를 실행하지 않습니다.</p>{result.validation.length ? <ul className="agent-validation">{result.validation.map((item, index) => <li key={index}>{item.status === 'passed' ? <Check size={16}/> : <CircleAlert size={16}/>}<div><strong>{item.check}</strong><span className={`agent-validation-status ${item.status}`}>{{ not_run: '미실행', passed: '통과 보고', failed: '실패 보고' }[item.status]}</span><p>{item.detail}</p></div></li>)}</ul> : <p>보고된 검증 항목이 없습니다.</p>}</div>
-    <div className="integration-section"><h3>확인한 출처</h3>{result.evidence.length ? result.evidence.map((item, index) => <a key={index} className="evidence-link" href={item.url} target="_blank" rel="noreferrer"><FileText size={17}/><div><strong>{item.label}</strong><small>{item.url}</small></div><ArrowUpRight size={15}/></a>) : <p>제출된 출처 링크가 없습니다.</p>}</div>
+    <div className="integration-section"><h3>{task.purpose === 'skills' ? '스킬 구성 변경 제안' : '어디를 바꾸면 좋을까요?'}</h3>{result.changes.length ? <ul className="path-candidates">{result.changes.map((change, index) => <li key={index}><FileText size={17}/><div><code>{change.path}</code><span>{uiText(change.proposal)}</span></div></li>)}</ul> : <p>구체적인 파일 변경 제안이 없습니다.</p>}</div>
+    <div className="integration-section"><h3>검증 보고</h3><p>아래 상태는 에이전트의 보고입니다. 이 사이트에서 코드를 실행하지 않습니다.</p>{result.validation.length ? <ul className="agent-validation">{result.validation.map((item, index) => <li key={index}>{item.status === 'passed' ? <Check size={16}/> : <CircleAlert size={16}/>}<div><strong>{item.check}</strong><span className={`agent-validation-status ${item.status}`}>{{ not_run: '미실행', passed: '통과 보고', failed: '실패 보고' }[item.status]}</span><p>{uiText(item.detail)}</p></div></li>)}</ul> : <p>보고된 검증 항목이 없습니다.</p>}</div>
+    <div className="integration-section"><h3>확인한 출처</h3>{result.evidence.length ? result.evidence.map((item, index) => <a key={index} className="evidence-link" href={item.url} target="_blank" rel="noreferrer"><FileText size={17}/><div><strong>{uiText(item.label)}</strong><small>{item.url}</small></div><ArrowUpRight size={15}/></a>) : <p>제출된 출처 링크가 없습니다.</p>}</div>
     <ReportList title="확인 범위와 한계" items={result.limitations}/>
   </section>;
 }
 function ReportList({ title, items }: { title: string; items: string[] }) {
-  return <div className="integration-section"><h3>{title}</h3>{items.length ? <ul className="agent-report-list">{items.map((item, index) => <li key={index}>{item}</li>)}</ul> : <p>제출된 항목이 없습니다.</p>}</div>;
+  return <div className="integration-section"><h3>{title}</h3>{items.length ? <ul className="agent-report-list">{items.map((item, index) => <li key={index}>{uiText(item)}</li>)}</ul> : <p>제출된 항목이 없습니다.</p>}</div>;
 }
