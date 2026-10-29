@@ -4,6 +4,7 @@ export const skillSearchQuery = z.string().trim().min(2, '검색어를 두 글�
 export type CatalogSkill = {
   id: string; name: string; source: string; slug: string; installs: number;
   url: string; repositoryUrl: string | null;
+  availability?: 'active' | 'moved' | 'deprecated';
 };
 export type SkillSearchResult = {
   query: string; skills: CatalogSkill[]; fetchedAt: string; stale: boolean;
