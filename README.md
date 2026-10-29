@@ -10,6 +10,8 @@ RepoFit은 프로젝트에 도입할 오픈소스와 에이전트에 추가할 �
 
 > 현재 상태: GitHub Trending·공개 레포 조회와 프로젝트 검토를 제공합니다. `/agent`는 개인 Codex 연결, skills.sh 후보 확인, 규칙 기반 활용 보고서와 로컬 Codex 작성을 지원하며 보고서·선택 사례 요약은 비공개 D1에 저장합니다. 프로젝트의 기존 탭 기반 RepoFit 스킬·WebMCP 검토도 유지합니다. 사이트 서버의 모델 추론과 방문자 플랜 직접 사용은 연결하지 않았습니다. 실행 방법은 [DEVELOPMENT.md](./DEVELOPMENT.md), 배포·인증은 [DEPLOYMENT.md](./DEPLOYMENT.md)를 참고하세요.
 
+스킬 가이드: 누적 설치 상위 300개의 한국어 설명, 작업 분류, 적용 방법과 예상 효과를 제공합니다. 공개 읽기와 개인 보고서는 저장된 자료를 사용합니다. [배포 v14와 비교 및 주간 갱신 계약](./docs/SKILL_CATALOG_RELEASE.md)을 참고하세요.
+
 내 에이전트: [구현·실행 안내](./docs/AGENT_COACH_IMPLEMENTATION.md) · [제품 설계](./docs/MY_AGENT_COACH_DESIGN.md) — 프로젝트 없는 Codex 연결, skills.sh 후보의 원본 확인, 활용 보고서·로컬 Codex 작성·선택 사례·실습 평가를 제공합니다. 자동 설치는 포함하지 않습니다.
 
 ## 내 에이전트로 검토하기
