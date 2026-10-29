@@ -887,3 +887,8 @@ dialog::backdrop { background: rgba(31,43,65,.19); -webkit-backdrop-filter: blur
   .primary-button, .secondary-button, .invitation-action, .sidebar-add, .sidebar-repo, .login-button, .nav-item.active, .mobile-nav > a.active { background: #daeaff; color: #163e6c; border-color: #6e8eae; }
 }
 @supports not (backdrop-filter: blur(1px)) { .sidebar, .topbar, .mobile-nav, .detail-dialog, .center-dialog, .account-popover, .toast, .list-toolbar { background: #f8f9fc; } }
+
+/* Keep wheel and touch scrolling inside repository details at their edges. */
+.detail-dialog, .trending-explanation, .trending-side, .explanation-readme pre {
+  overscroll-behavior: contain;
+}
