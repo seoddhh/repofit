@@ -12,6 +12,7 @@ try {
   symlinkSync(resolve('node_modules'), join(temporary, 'node_modules')); mkdirSync(join(temporary, 'lib'));
   const compile = (source, output, transform = value => value) => writeFileSync(join(temporary, output), ts.transpileModule(transform(readFileSync(source, 'utf8')), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText);
   for (const name of ['skills-types', 'skills-server']) compile(`lib/${name}.ts`, `lib/${name}.js`);
+  writeFileSync(join(temporary, 'lib/catalog-store.js'), 'exports.catalogSearch = async query => ({skills:[],checkedAt:new Date().toISOString(),sourceUrl:"https://www.skills.sh/"});');
   compile('app/api/skills/route.ts', 'route.js', code => code.replaceAll('@/lib/', './lib/'));
   const require = createRequire(import.meta.url);
   const { searchSkills } = require(join(temporary, 'lib/skills-server.js'));
@@ -35,7 +36,7 @@ try {
   await searchSkills('react'); assert.equal(requests, 1);
   await searchSkills('react & owner=evil');
   await assert.rejects(() => searchSkills('a'));
-  assert.equal((await GET(new Request('https://repofit.example/api/skills?q=a'))).status, 400);
+  assert.equal((await GET(new Request('https://repofit.example/api/skills?q=a'))).status, 200);
   globalThis.fetch = async () => Response.json({ skills: [{ ...skill, id: 'vercel-labs/../secret' }] });
   await assert.rejects(() => searchSkills('invalid-path'), /출처 형식/);
   globalThis.fetch = async () => Response.json({ skills: [{ ...skill, installs: -1 }] });
@@ -45,8 +46,8 @@ try {
   globalThis.fetch = async () => Response.json({ skills: [{ id: 'mintlify.com/mintlify', name: 'mintlify', source: 'mintlify.com', installs: 2 }] });
   assert.equal((await searchSkills('well-known')).skills[0].repositoryUrl, null);
   globalThis.fetch = async () => Response.json({ error: 'rate_limited' }, { status: 429, headers: { 'Retry-After': '25' } });
-  const rateLimited = await GET(new Request('https://repofit.example/api/skills?q=rate-limited'));
-  assert.equal(rateLimited.status, 429); assert.equal(rateLimited.headers.get('retry-after'), '25');
+  await assert.rejects(() => searchSkills('rate-limited'), error => error.status === 429 && error.retryAfter === 25);
+  assert.equal((await GET(new Request('https://repofit.example/api/skills?q=rate-limited'))).status, 200, 'Stored catalog search does not depend on upstream availability');
   Date.now = () => originalNow() + 61000;
   assert.equal((await searchSkills('react')).stale, true);
   Date.now = () => originalNow() + 3600001;

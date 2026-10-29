@@ -43,6 +43,13 @@
       "when": 1793086452006,
       "tag": "0005_activity_integrity",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1793290119980,
+      "tag": "0006_exotic_supreme_intelligence",
+      "breakpoints": true
     }
   ]
 }

@@ -1,32 +1,25 @@
-import { searchSkills } from './skills-server';
-import { inspectSkillSource } from './skill-source';
-import { goalNeeds, initialNarrative, rankCandidates, workQueries } from './coach-rules';
+import { readSkillCatalog } from './catalog-store';
+import { initialNarrative, rankCandidates } from './coach-rules';
 import { assessmentLabels, type CoachInput, type CoachBundle, type ActivitySummary } from './coach-types';
 import type { LocalInventory } from './local-agent-types';
-import type { CatalogSkill } from './skills-types';
 
 export async function prepareCoachReport(input: CoachInput, snapshot: LocalInventory | null, activities: ActivitySummary[] = []) {
   const runtime = snapshot?.agents.find(agent => agent.id === input.agent);
   const inventory = runtime?.skills ?? [];
-  // Send topic labels only, never the questionnaire, inventory, or personal goal.
-  const queries = [...new Set([...goalNeeds(input.goal).map(need => need.query), ...input.work.map(kind => workQueries[kind]), ...activities.flatMap(a => a.summary.work.map(kind => workQueries[kind]))])].slice(0, 4);
-  if (input.candidateId) queries.unshift(input.candidateId.split('/').at(-1)!);
-  const searched = await Promise.allSettled(queries.map(query => searchSkills(query)));
+  // Public descriptions are prepared once. A personal report never queries
+  // skills.sh or GitHub and never sends the user's goal to those services.
+  const catalog = await readSkillCatalog();
   const warnings: string[] = [];
-  const found = new Map<string, CatalogSkill>();
-  const groups: CatalogSkill[][] = [];
-  for (const result of searched) {
-    if (result.status === 'rejected') { warnings.push('일부 관심 작업의 skills.sh 검색에 실패했습니다. 후보가 누락될 수 있습니다.'); continue; }
-    if (result.value.stale) warnings.push('일부 후보는 이전 skills.sh 검색 결과입니다.');
-    groups.push(result.value.skills.slice(0, 4));
-    const requested = result.value.skills.find(item => item.id === input.candidateId);
-    if (requested) found.set(requested.id, requested);
-  }
-  for (let index = 0; index < 4; index++) for (const group of groups) if (group[index]) found.set(group[index].id, group[index]);
-  if (input.candidateId && !found.has(input.candidateId)) warnings.push('선택한 카탈로그 후보를 현재 검색 응답에서 찾지 못했습니다. 다른 작업 후보를 함께 살펴봤습니다.');
-  const selected = [...found.values()].sort((a, b) => Number(b.id === input.candidateId) - Number(a.id === input.candidateId)).slice(0, 6);
-  const inspected = await Promise.all(selected.map(async skill => ({ ...skill, sourceEvidence: await inspectSkillSource(skill) })));
-  const candidates = rankCandidates(input, inspected, inventory);
+  const inspected = catalog.skills.map(skill => ({ ...skill, sourceEvidence: {
+    status: 'verified' as const, kind: 'skills_sh_snapshot' as const,
+    description: skill.explanation.summary,
+    body: [skill.explanation.summary, ...skill.explanation.capabilities, ...skill.explanation.problems].join('\n'),
+    revision: null, path: null, url: skill.url, hash: skill.contentHash, license: null, resources: [],
+    checkedAt: skill.checkedAt,
+    warning: 'skills.sh 공개 원문과 저장된 설명입니다. 고정 GitHub 커밋 확인이나 실행 호환성 검증은 아닙니다.',
+  } }));
+  if (input.candidateId && !catalog.skills.some(skill => skill.id === input.candidateId)) warnings.push('선택한 스킬이 현재 상위 300개 목록에 없습니다. 저장된 다른 후보와 목표를 비교했습니다.');
+  const candidates = rankCandidates(input, inspected, inventory).slice(0, 6);
   const bundle: CoachBundle = {
     input, observedAt: snapshot?.observedAt ?? null, inventory, inventoryStatus: runtime?.status ?? 'not_connected', candidates,
     evidence: [

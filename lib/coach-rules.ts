@@ -20,19 +20,20 @@ const vocabulary = {
 const words = (text: string) => new Set(text.toLowerCase().match(/[a-z0-9가-힣]+/g) ?? []);
 const normalizeName = (text: string) => text.toLowerCase().split(':').at(-1)?.replace(/[^a-z0-9가-힣]/g, '') ?? '';
 export function rankCandidates(input: CoachInput, candidates: Omit<CoachCandidate, 'score' | 'reasons' | 'relation' | 'overlap' | 'matchedWork' | 'compatibility'>[], inventory: LocalSkill[]): CoachCandidate[] {
-  const goals = words(input.goal);
+  const goals = new Set([...words(input.goal)].map(word => word.replace(/(으로|에서|하고|하는|합니다|해요|싶어요|싶습니다|을|를|은|는|이|가)$/u, '')).filter(word => !['에이전트', '스킬', '현재', '작업', '문제', '도움', '함께', '필요', '사용', '관련'].includes(word)));
   return candidates.map(candidate => {
     const source = candidate.sourceEvidence;
     const verified = source.status === 'verified';
+    const eligible = verified && candidate.availability !== 'deprecated';
     const text = `${candidate.name} ${source.description} ${source.body.slice(0, 12000)}`.toLowerCase();
     const tokens = words(text);
-    const matchedWork = verified ? input.work.filter(kind => vocabulary[kind].some(term => tokens.has(term))) : [];
-    const matchedNeeds = verified ? goalNeeds(input.goal).filter(need => vocabulary[need.kind].some(term => tokens.has(term))) : [];
-    const goalMatches = [...goals].filter(word => word.length > 2 && tokens.has(word)).length;
+    const matchedWork = eligible ? input.work.filter(kind => candidate.explanation?.workKinds.includes(kind) || vocabulary[kind].some(term => tokens.has(term))) : [];
+    const matchedNeeds = eligible ? goalNeeds(input.goal).filter(need => candidate.explanation?.workKinds.includes(need.kind) || vocabulary[need.kind].some(term => tokens.has(term))) : [];
+    const goalMatches = [...goals].filter(word => word.length > 1 && text.includes(word)).length;
     const overlap = inventory.filter(skill => !['disabled', 'shadowed'].includes(skill.status) && normalizeName(skill.name) === normalizeName(candidate.slug)).map(skill => skill.name);
     // Install count deliberately does not participate. Scores are internal relevance signals, not skill quality or proficiency.
-    const score = verified ? matchedWork.length * 30 + matchedNeeds.length * 20 + Math.min(goalMatches, 3) * 5 + (input.candidateId === candidate.id && (matchedWork.length || matchedNeeds.length) ? 5 : 0) : 0;
-    const reasons = [verified ? '고정 커밋의 SKILL.md 이름과 본문을 확인했습니다.' : '스킬 원본을 확인하지 못해 추천에서 제외했습니다.', ...matchedWork.map(kind => `${workLabels[kind]} 작업 관련 용어가 원본에 있습니다.`), ...matchedNeeds.map(need => `목표에서 언급한 ${workLabels[need.kind]} 관련 필요와 원본의 용어를 비교했습니다.`), ...(overlap.length ? ['같은 이름의 활성 스킬이 있어 기존 스킬 활용을 먼저 제안합니다. 이름 일치만으로 내용 동일성을 확정하지 않습니다.'] : []), '설치 집계는 적합성 점수에 사용하지 않았습니다.'];
+    const score = eligible ? matchedWork.length * 30 + matchedNeeds.length * 20 + Math.min(goalMatches, 6) * 12 + (input.candidateId === candidate.id && (matchedWork.length || matchedNeeds.length) ? 15 : 0) : 0;
+    const reasons = [...(candidate.availability === 'deprecated' ? ['현재 원문에서 폐기된 호환 항목으로 표시되어 새 추천에서 제외합니다.'] : []), verified ? source.kind === 'skills_sh_snapshot' ? '저장된 skills.sh 공개 원문과 한국어 설명을 확인했습니다. GitHub 커밋 확인과는 구분합니다.' : '고정 커밋의 SKILL.md 이름과 본문을 확인했습니다.' : '스킬 원본을 확인하지 못해 추천에서 제외했습니다.', ...matchedWork.map(kind => `${workLabels[kind]} 작업 분류와 스킬의 기능을 비교했습니다.`), ...matchedNeeds.map(need => `목표에서 언급한 ${workLabels[need.kind]} 관련 필요와 원본의 용어를 비교했습니다.`), ...(overlap.length ? ['같은 이름의 활성 스킬이 있어 기존 스킬 활용을 먼저 제안합니다. 이름 일치만으로 내용 동일성을 확정하지 않습니다.'] : []), '설치 집계는 적합성 점수에 사용하지 않았습니다.'];
     return { ...candidate, score, reasons, relation: !verified ? 'unverified' as const : overlap.length ? 'use_existing' as const : 'add' as const, overlap, matchedWork: [...new Set([...matchedWork, ...matchedNeeds.map(n => n.kind)])], compatibility: 'needs_check' as const };
   }).sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));
 }
@@ -55,10 +56,10 @@ export function initialNarrative(bundle: CoachBundle): CoachNarrative {
     habits: habitAxes.map(axis => ({ action: habitGuides[axis][0], examplePrompt: habitGuides[axis][1], evidenceIds: [`assessment:${axis}`] })),
     recommendations: candidates.filter(c => c.score > 0 && c.sourceEvidence.status === 'verified').slice(0, 3).map(c => ({
       catalogSkillId: c.id, reason: `${c.matchedWork.map(v => workLabels[v as keyof typeof workLabels]).join(', ')} 관련성이 원본에서 확인된 검토 후보입니다. ${c.overlap.length ? '같은 이름의 기존 스킬부터 활용해 보세요.' : '실행 도구와 환경 호환성은 적용 전에 추가 확인해야 합니다.'}`,
-      evidenceIds: ['goal', `source:${c.id}`], prerequisites: ['원본의 필요한 도구 및 계정 및 권한을 확인하세요.', '현재 에이전트에서의 실제 실행 호환성은 아직 확인하지 않았습니다.'],
-      steps: [c.overlap.length ? '현재 인식된 같은 이름의 스킬과 원본의 목적 및 내용을 비교하세요.' : `${c.url}에서 설치 안내와 스킬의 모든 지원 파일을 확인하세요.`, `${input.agent === 'codex' ? '~/.agents/skills' : '~/.claude/skills'} 개인 범위를 선택하고 변경 파일을 검토한 뒤 설치하세요.`, `현재 보고서는 ${c.sourceEvidence.revision} 커밋을 확인했습니다. 설치 안내가 최신 브랜치를 사용하면 내용이 달라질 수 있습니다.`, '목록을 새로 조회해 인식을 확인하고 아래 요청으로 작은 작업에 사용하세요.'],
+      evidenceIds: ['goal', `source:${c.id}`], prerequisites: [...(c.explanation?.requirements ?? ['원본의 필요한 도구 및 계정 및 권한을 확인하세요.']), '현재 에이전트에서의 실제 실행 호환성은 아직 확인하지 않았습니다.'],
+      steps: [c.overlap.length ? '현재 인식된 같은 이름의 스킬과 원본의 목적 및 내용을 비교하세요.' : `${c.url}에서 설치 안내와 스킬의 모든 지원 파일을 확인하세요.`, `${input.agent === 'codex' ? '~/.agents/skills' : '~/.claude/skills'} 개인 범위를 선택하고 변경 파일을 검토한 뒤 설치하세요.`, ...(c.explanation?.steps?.slice(0, 3) ?? []), c.sourceEvidence.kind === 'skills_sh_snapshot' ? `현재 보고서는 ${c.sourceEvidence.checkedAt}의 공개 원문을 사용합니다. 설치 전에 최신 조건을 다시 확인하세요.` : `현재 보고서는 ${c.sourceEvidence.revision} 커밋을 확인했습니다. 설치 시 내용이 달라질 수 있습니다.`, '목록을 새로 조회해 인식을 확인하고 아래 요청으로 작은 작업에 사용하세요.'],
       examplePrompt: `$${c.slug} 스킬을 사용해 ${input.goal.slice(0, 600)}. 필요한 입력을 확인하고, 결과의 확인 방법과 미확인 부분을 알려 줘.`,
-      expectedBenefits: ['반복 작업의 절차를 일정하게 만드는 데 도움이 될 수 있습니다. 실제 효과는 실습 후 확인해야 합니다.'],
+      expectedBenefits: c.explanation?.benefits ?? ['반복 작업의 절차를 일정하게 만드는 데 도움이 될 수 있습니다. 실제 효과는 실습 후 확인해야 합니다.'],
       exercise: `${input.work.map(v => workLabels[v]).join(', ')} 중 작은 작업 하나에 이 스킬을 명시적으로 요청해 보세요.`, checks: ['원하는 산출물이 나왔는지 확인', '검증 및 출처가 필요한 경우 확인 여부 기록', '효과가 없거나 다시 작업한 이유 기록'],
     })),
     limitations: ['자가 응답은 실제 행동 검증과 다릅니다.', '설치 및 목록 인식 및 사용 요청 및 실제 실행 및 효과는 서로 다른 상태입니다.', '원본 확인은 안전성 감사나 에이전트 실행 호환성 검증이 아닙니다.', '기대 효과는 예상이며 시간 및 비용 절감이나 숙련도 점수를 측정하지 않았습니다.'],

@@ -17,6 +17,8 @@ try {
   const compile = (source, target, transform = s => s) => writeFileSync(join(temporary, target), ts.transpileModule(transform(readFileSync(source, 'utf8')), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText);
   for (const name of ['repository-types', 'trending-parser', 'github-server', 'brief-types', 'brief-evidence', 'brief-store']) compile(`lib/${name}.ts`, `lib/${name}.js`);
   compile('db/schema.ts', 'db/schema.js');
+  compile('lib/catalog-types.ts', 'lib/catalog-types.js');
+  writeFileSync(join(temporary, 'lib/catalog-store.js'), 'exports.readSkillCatalog = async () => ({skills:[]}); exports.getSkillCatalogQueue = async () => ({queue:[]});');
   writeFileSync(join(temporary, 'db/index.js'), 'exports.getDb = () => globalThis.__briefDb;');
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec(readFileSync('drizzle/0000_tricky_paibok.sql', 'utf8'));
@@ -67,7 +69,11 @@ try {
     await store.publishBrief({ repository: item.repository, fingerprint: item.fingerprint, content: rowContent });
   }
   assert.equal((await store.listBriefs()).length, 3);
+  const readBefore = requests;
+  assert.equal((await store.readBrief('owner/not-yet-written')).evidence, null);
+  assert.equal(requests, readBefore, 'Missing public briefs never fetch external sources');
   const saved = await store.readBrief('OWNER/REPO0');
+  assert.equal(requests, readBefore, 'Saved public briefs never fetch external sources');
   assert.equal(saved.article.content.tagline, content.tagline); assert.equal(saved.stale, false);
   queue = await store.collectEditorialQueue(); assert.equal(queue.queue[0].repository, 'owner/repo3');
   const item = queue.queue[0];
@@ -121,6 +127,15 @@ try {
   await store.publishBrief({ repository: pending.queue[0].repository, fingerprint: pending.queue[0].fingerprint, content: { ...content, trendReasons: [{ ...content.trendReasons[0], sourceUrls: [changed.sources[1].url] }] } });
   assert.equal((await store.collectEditorialQueue({ refreshAfter })).dueRepositories, 0);
 
+  const oldSource = { ...evidence, id: 'owner/source-only', fetchedAt: '2020-01-01T00:00:00.000Z' };
+  await globalThis.__briefDb.insert(editorialSources).values({ id: oldSource.id, evidence: oldSource, fingerprint: await evidenceFingerprint(oldSource), fetchedAt: oldSource.fetchedAt });
+  const fetchBeforeOfflineRead = globalThis.fetch;
+  globalThis.fetch = async () => { throw new Error('GitHub unavailable'); };
+  const fallback = await store.readBrief(oldSource.id);
+  assert.equal(fallback.evidence.readme, oldSource.readme);
+  assert.equal(fallback.stale, true);
+  assert.ok((await store.readBrief('owner/repo0')).article);
+  globalThis.fetch = fetchBeforeOfflineRead;
   // Newly failed source collection must not replace a previously complete article.
   const incomplete = { ...changed, warnings: ['README를 읽지 못했습니다.'], readme: null };
   await globalThis.__briefDb.update(editorialSources).set({ evidence: incomplete }).where(require('drizzle-orm').eq(editorialSources.id, 'owner/repo12'));

@@ -20,6 +20,7 @@ try {
   function compile(source, target, replace = s => s) { writeFileSync(join(dir, target), ts.transpileModule(replace(readFileSync(source, 'utf8')), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText); }
   for (const name of ['coach-types', 'coach-rules', 'coach-server', 'coach-store', 'skill-source', 'skills-types', 'skills-server', 'github-server', 'trending-parser', 'repository-types', 'local-agent-types', 'local-agent-store', 'local-agent-http']) compile(`lib/${name}.ts`, `lib/${name}.js`);
   compile('db/schema.ts', 'db/schema.js');
+  writeFileSync(join(dir, 'lib/catalog-store.js'), 'exports.readSkillCatalog = async () => globalThis.__coachCatalog;');
   writeFileSync(join(dir, 'db/index.js'), 'exports.getDb = () => globalThis.__coachDb;');
   writeFileSync(join(dir, 'auth.js'), 'exports.getChatGPTUser = async () => globalThis.__coachUser;');
   for (const [name, source] of [['reports', 'app/api/agent-reports/route.ts'], ['jobs', 'app/api/local-agent/jobs/route.ts'], ['activities', 'app/api/agent-activity/route.ts'], ['activityUpload', 'app/api/local-agent/activity/route.ts']]) compile(source, `routes/${name}.js`, code => code.replaceAll('@/app/chatgpt-auth', '../auth').replaceAll('@/lib/', '../lib/'));
@@ -52,6 +53,16 @@ try {
     if (slug) return new Response(`---\nname: ${slug === 'mismatch' ? 'wrong-name' : slug}\ndescription: ${slug === 'useful-skill' ? 'Coding and testing procedures' : 'Video production and audio mixing'}\n---\n${slug === 'useful-skill' ? 'Use for coding. Verify results.' : 'Produce films and music.'}`);
     throw new Error(`Unexpected URL: ${value}`);
   };
+  const { inspectSkillSource } = require(join(dir, 'lib/skill-source.js'));
+  assert.equal((await inspectSkillSource({ id: 'acme/tools/mismatch', source: 'acme/tools', slug: 'mismatch' })).status, 'unverified');
+  requests.length = 0;
+  globalThis.__coachCatalog = { skills: titles.slice(0, 2).map((name, i) => ({
+    id: `acme/tools/${name}`, name, source: 'acme/tools', slug: name, installs: i ? 100000000 : 1,
+    url: `https://www.skills.sh/acme/tools/${name}`, repositoryUrl: 'https://github.com/acme/tools', rank: i + 1,
+    contentHash: 'a'.repeat(64), checkedAt: new Date().toISOString(), writtenAt: new Date().toISOString(),
+    explanation: { category: i ? 'media' : 'development', workKinds: i ? ['design'] : ['coding'], tagline: i ? '영상 제작을 돕는 공개 스킬입니다.' : '코드 작성과 테스트를 돕는 스킬입니다.', summary: i ? 'Video production and audio mixing' : 'Coding and testing procedures', capabilities: i ? ['영상 제작'] : ['코드 작성', '테스트'], problems: ['작업 절차를 확인하려는 경우에 살펴봅니다.'], steps: ['공식 안내에서 작업 절차를 확인합니다.'], benefits: ['작업 절차 정리에 도움이 될 수 있습니다.'], requirements: ['필요한 실행 도구를 확인해야 합니다.'], limitations: ['실제 실행 효과는 검증하지 않았습니다.'] },
+  })) };
+  globalThis.fetch = async () => { throw new Error('External services unavailable'); };
   const pairing = await devices.createLocalPairing('a');
   const connection = await devices.claimLocalPairing({ code: pairing.code, name: 'Test Mac' });
   const inventory = { protocolVersion: 2, profileId: crypto.randomUUID(), context: { kind: 'personal' }, project: null, observedAt: new Date().toISOString(), agents: [{ id: 'codex', version: 'test', status: 'ready', skills: [{ id: 's1', name: 'useful-skill', description: 'coding', scope: 'user', source: '~/.agents/skills/useful-skill/SKILL.md', plugin: null, status: 'recognized', evidence: 'Runtime list only', hash: null }], warnings: [] }] };
@@ -70,11 +81,12 @@ try {
   assert.equal(report.narrative.recommendations.length, 1);
   assert.equal(report.narrative.recommendations[0].catalogSkillId, 'acme/tools/useful-skill');
   assert.equal(report.bundle.candidates.find(c => c.slug === 'famous-video').score, 0, 'Popularity must not override fit');
-  assert.equal(report.bundle.candidates.find(c => c.slug === 'mismatch').sourceEvidence.status, 'unverified');
-  assert.deepEqual(report.bundle.candidates.find(c => c.slug === 'mismatch').matchedWork, [], 'Unverified content must not be presented as source evidence');
   assert.equal(report.bundle.candidates[0].relation, 'use_existing');
   assert.equal(requests.some(url => url.includes('PRIVATE_GOAL')), false);
-  assert.equal(requests.filter(url => url.includes('/git/trees/')).length, 1, 'Share immutable source tree retrieval');
+  assert.equal(requests.length, 0, 'Personal reports use stored descriptions without external requests');
+  assert.equal(report.bundle.candidates[0].sourceEvidence.kind, 'skills_sh_snapshot');
+  assert.equal(report.narrative.recommendations[0].expectedBenefits[0], globalThis.__coachCatalog.skills[0].explanation.benefits[0]);
+  assert.equal(types.coachInputSchema.safeParse({ ...input, candidateId: 'example.com/skill-name' }).success, true);
   assert.ok(!('leaseHash' in report));
   assert.equal((await jobs.POST(request('POST'))).status, 401);
   assert.equal((await api.PATCH(request('PATCH', { action: 'queue', id: report.id, consent: false }))).status, 400);
@@ -148,5 +160,5 @@ try {
   assert.equal(samples.length, 2); assert.ok(!JSON.stringify(samples).includes('PRIVATE_OUTPUT')); assert.ok(!JSON.stringify(samples).includes('SECRET_AGENT_OUTPUT'));
   console.log('통과: 프로젝트 없는 개인 연결·프로필 유지·skills.sh 후보 검색·고정 원본 확인·인기 제외·기존 스킬 우선·근거/후보 검증·소유권·동의·작업 lease/취소/중복/만료·선택 사례 삭제·보고서 복원·로컬 Codex 실행 계약');
 } finally {
-  globalThis.fetch = originalFetch; delete globalThis.__coachDb; delete globalThis.__coachUser; database?.close(); rmSync(dir, { recursive: true, force: true });
+  globalThis.fetch = originalFetch; delete globalThis.__coachDb; delete globalThis.__coachCatalog; delete globalThis.__coachUser; database?.close(); rmSync(dir, { recursive: true, force: true });
 }
