@@ -31,6 +31,12 @@ try {
   assert.equal(parsed[0].stars, 1234); assert.equal(parsed[0].today, 17);
   assert.equal(parsed[0].description, 'Tools & code 🚀');
   assert.equal(parsed[1].stars, null); assert.equal(parsed[1].today, null); assert.equal(parsed[1].language, null);
+  for (const [period, text] of [['weekly', 'this week'], ['monthly', 'this month']]) {
+    const periodFixture = fixture.replace('17 stars today', `1,789 stars ${text}`);
+    assert.equal(parseTrending(periodFixture, period)[0].today, 1789, `${period} stars are collected`);
+    assert.equal(parseTrending(periodFixture)[0].today, null, 'A different period is never treated as daily stars');
+    assert.equal(parseTrending(periodFixture.replace(`1,789 stars ${text}`, `1 star ${text}`), period)[0].today, 1);
+  }
   assert.throws(() => parseTrending('<html><h1>Access denied</h1></html>'));
   assert.throws(() => parseTrending(fixture + fixture));
   const project = { id: 'owner/app', paths: ['package.json','src/hooks/use-data.ts','src/lib/api.ts','.env'], dependencies: { '@tanstack/react-query': '^5.0.0' } };
@@ -42,10 +48,35 @@ try {
   assert.equal(await boundedText(new Response('한글'), 10), '한글');
   const originalFetch = globalThis.fetch;
   let offline = false;
-  globalThis.fetch = async () => { if (offline) throw new Error('offline'); return new Response(fixture); };
+  const upstream = [];
+  globalThis.fetch = async url => {
+    upstream.push(url);
+    if (offline) throw new Error('offline');
+    const period = new URL(url).searchParams.get('since');
+    const periodText = { daily: 'today', weekly: 'this week', monthly: 'this month' }[period];
+    return new Response(fixture.replace('17 stars today', `17 stars ${periodText}`));
+  };
   const snapshot = await getTrending(); assert.equal(snapshot.repositories[0].rank, 1); assert.equal(snapshot.stale, false);
+  const [weekly, weeklyReplay] = await Promise.all([getTrending('weekly'), getTrending('weekly')]);
+  assert.equal(weekly, weeklyReplay);
+  assert.equal(weekly.sourceUrl, 'https://github.com/trending?since=weekly');
+  assert.equal(weekly.repositories[0].today, 17);
+  assert.equal(upstream.length, 2, 'Concurrent requests are shared per period');
+  assert.equal(await getTrending(), snapshot, 'Daily cache is independent of weekly cache');
+  offline = true;
+  await assert.rejects(() => getTrending('monthly'), /offline/, 'Uncached periods never fall back to a different period');
+  offline = false;
+  const monthly = await getTrending('monthly');
+  assert.equal(monthly.sourceUrl, 'https://github.com/trending?since=monthly');
+  assert.equal(monthly.repositories[0].today, 17);
   const originalNow = Date.now; Date.now = () => originalNow() + 400000; offline = true;
-  assert.equal((await getTrending()).stale, true); Date.now = originalNow;
+  try {
+    for (const period of ['daily', 'weekly', 'monthly']) {
+      const staleSnapshot = await getTrending(period);
+      assert.equal(staleSnapshot.stale, true);
+      assert.equal(staleSnapshot.sourceUrl, `https://github.com/trending?since=${period}`, 'Stale fallback stays within the selected period');
+    }
+  } finally { Date.now = originalNow; }
   globalThis.fetch = async (url) => {
     if (url.endsWith('/repos/owner/app')) return Response.json({ full_name: 'owner/app', description: '', language: 'TypeScript', stargazers_count: 0, license: null, default_branch: 'main' });
     if (url.includes('/git/ref/heads/')) return Response.json({ object: { sha: 'abc123' } });

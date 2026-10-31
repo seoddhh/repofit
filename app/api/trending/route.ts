@@ -1,8 +1,12 @@
 import { getTrending } from '@/lib/github-server';
 
-export async function GET() {
+export async function GET(request: Request) {
+  const period = new URL(request.url).searchParams.get('since') ?? 'daily';
+  if (period !== 'daily' && period !== 'weekly' && period !== 'monthly') {
+    return Response.json({ error: '지원하지 않는 트렌딩 기간입니다.' }, { status: 400, headers: { 'Cache-Control': 'no-store' } });
+  }
   try {
-    const snapshot = await getTrending();
+    const snapshot = await getTrending(period);
     const age = Math.max(0, Date.now() - Date.parse(snapshot.fetchedAt));
     const remaining = Math.max(0, 300 - Math.ceil(age / 1000));
     return Response.json(snapshot, { headers: { 'Cache-Control': snapshot.stale ? 'no-store' : `private, max-age=${remaining}` } });

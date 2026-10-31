@@ -1,5 +1,5 @@
 import { parseTrending } from './trending-parser';
-import type { RepositoryOverview, TrendingSnapshot } from './repository-types';
+import type { RepositoryOverview, TrendingPeriod, TrendingSnapshot } from './repository-types';
 
 export class GitHubError extends Error {
   constructor(message: string, public status = 502) { super(message); }
@@ -36,25 +36,29 @@ export async function github(path: string, accept = 'application/vnd.github+json
   return response;
 }
 
-let trendingCache: TrendingSnapshot | null = null;
-let trendingRequest: Promise<TrendingSnapshot> | null = null;
-export async function getTrending(): Promise<TrendingSnapshot> {
-  if (trendingCache && Date.now() - Date.parse(trendingCache.fetchedAt) < 300000) return trendingCache;
-  if (trendingRequest) return trendingRequest;
-  trendingRequest = (async () => {
+const trendingCache = new Map<TrendingPeriod, TrendingSnapshot>();
+const trendingRequests = new Map<TrendingPeriod, Promise<TrendingSnapshot>>();
+export async function getTrending(period: TrendingPeriod = 'daily'): Promise<TrendingSnapshot> {
+  const cached = trendingCache.get(period);
+  if (cached && Date.now() - Date.parse(cached.fetchedAt) < 300000) return cached;
+  const pending = trendingRequests.get(period);
+  if (pending) return pending;
+  const request = (async () => {
     try {
-      const sourceUrl = 'https://github.com/trending?since=daily';
+      const sourceUrl = `https://github.com/trending?since=${period}`;
       const response = await fetch(sourceUrl, { headers: { 'User-Agent': 'RepoFit', Accept: 'text/html' }, signal: AbortSignal.timeout(15000), redirect: 'manual' });
       if (!response.ok) throw new GitHubError('GitHub Trending에 연결하지 못했습니다.');
-      const repositories = parseTrending(await boundedText(response, 2000000));
-      trendingCache = { repositories, sourceUrl, fetchedAt: new Date().toISOString(), stale: false };
-      return trendingCache;
+      const repositories = parseTrending(await boundedText(response, 2000000), period);
+      const snapshot = { repositories, sourceUrl, fetchedAt: new Date().toISOString(), stale: false };
+      trendingCache.set(period, snapshot);
+      return snapshot;
     } catch (error) {
-      if (trendingCache) return { ...trendingCache, stale: true };
+      if (cached) return { ...cached, stale: true };
       throw error;
-    } finally { trendingRequest = null; }
+    } finally { trendingRequests.delete(period); }
   })();
-  return trendingRequest;
+  trendingRequests.set(period, request);
+  return request;
 }
 
 type Metadata = { full_name: string; description: string | null; language: string | null; stargazers_count: number; license: { spdx_id: string } | null; default_branch: string };

@@ -1,3 +1,5 @@
+export type TrendingPeriod = 'daily' | 'weekly' | 'monthly';
+
 export type TrendingRepo = {
   id: string;
   rank: number;
@@ -5,6 +7,7 @@ export type TrendingRepo = {
   language: string | null;
   color: string | null;
   stars: number | null;
+  /** Stars gained during the requested period (legacy field name). */
   today: number | null;
 };
 
