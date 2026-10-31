@@ -43,3 +43,13 @@ Sites 프로젝트 식별자는 `.openai/hosting.json`에 보관합니다. 초�
 - [Sites: Sign in with ChatGPT](https://learn.chatgpt.com/docs/sites?surface=app)
 - [Sign in with ChatGPT quickstart](https://developers.openai.com/siwc/quickstart)
 - [ChatGPT plan usage: 원격 호스팅 앱의 별도 참여](https://developers.openai.com/siwc/token-sharing-open-source)
+
+## 2026-11-01 트렌딩 기간 확장 배포 전 확인
+
+이번 변경은 [기간별 수집·해설 중복 방지](docs/TRENDING_PERIODS.md)와 [예약 지침 준비본](docs/EDITORIAL_SCHEDULE_PROMPT.md)을 함께 반영합니다. 이 문서 갱신은 배포 완료 기록이 아닙니다.
+
+배포 전에 타입 검사, `scripts/verify-repositories.mjs`, `scripts/verify-ui-behavior.mjs`, `scripts/verify-briefs.mjs`와 프로덕션 빌드를 확인합니다. 오늘·이번 주·이번 달 버튼, 선택 기간의 스타 표기·원본 링크, 검색·언어 필터, 빠른 전환 시 이전 응답 무시를 확인합니다.
+
+배포 후 MCP 도구 정의와 서버 응답의 `source-content-v2`, `periods` 세 항목, 중복 제거된 `totalRepositories`를 확인합니다. 변경 없는 항목의 본문·작성 시각이 유지되고, 같은 근거의 중복 게시가 `unchanged: true`로 생략되는지 확인합니다. 기존 DB 마이그레이션이나 일괄 재작성은 필요하지 않습니다.
+
+2026-11-01 Sites 조회에서 해설 예약은 매일 09:17 Asia/Seoul 일정으로 등록되어 있으나 일시중지 상태였습니다. 배포만으로 예약이 재개되지는 않습니다. 기존 예약의 재개·클라우드 본문 저장·무인 실행 성공은 별도로 확인하며 중복 예약은 만들지 않습니다.

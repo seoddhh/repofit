@@ -92,8 +92,10 @@ Sites Dispatch가 `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`�
 
 ## 트렌딩 조회 캐시
 
-브라우저는 `/api/trending`으로 조회하고 서버는 GitHub Trending HTML을 수집합니다. REST 저장소 API와는 별도 경로입니다. 기존 화면은 진입할 때마다 API를 호출하고 응답도 `no-store`였지만 서버 내부에서는 이미 수집 결과를 5분간 재사용했습니다.
+브라우저는 `/api/trending?since=daily|weekly|monthly`로 선택한 기간을 조회하고 서버는 같은 `since`의 GitHub Trending HTML을 수집합니다. 인자가 없으면 daily, 잘못된 값은 400입니다. 기간별 목록·요청·캐시는 분리되며, 원본 순위를 유지합니다. [수집·중복 방지 상세](docs/TRENDING_PERIODS.md)를 참고하세요. REST 저장소 API와는 별도 경로입니다. 기존 화면은 진입할 때마다 API를 호출하고 응답도 `no-store`였지만 서버 내부에서는 이미 수집 결과를 5분간 재사용했습니다.
 
 현재는 브라우저에서도 원래 수집 시각부터 5분 동안 결과를 재사용하고 진행 중인 요청을 공유합니다. 화면을 오가거나 개발 모드에서 effect가 다시 실행돼도 유효한 결과를 다시 요청하지 않습니다. 정상 API 응답에는 남은 시간만큼 `private, max-age`를 적용하고 오류와 이전 자료 응답은 HTTP 캐시하지 않습니다. 명시적인 새로고침은 브라우저 캐시를 우회해 서버 결과를 조회합니다. 서버의 원본 수집 정책은 그대로 5분입니다.
 
 서버 캐시는 인스턴스 메모리에 있으므로 서버 재시작이나 다른 Worker 인스턴스 사이에서는 공유되지 않습니다. 여러 사용자 전체의 GitHub 수집을 5분에 한 번으로 제한하는 영속 캐시는 아닙니다. `node scripts/verify-ui-behavior.mjs`에서 요청 공유, 만료, 수동 새로고침과 HTTP 잔여 시간을 확인합니다.
+
+해설 큐는 세 기간의 저장소 합집합을 대소문자 구분 없이 한 번씩 검사합니다. 내용 지문에서 모든 GitHub Trending 출처와 기간·순위·스타·시간을 제외하고 README·릴리스 등의 실질적 변경만 감지합니다. 게시 API도 같은 근거의 재요청을 생략합니다. `node scripts/verify-briefs.mjs`는 기간 중복·주간/월간 전용 저장소·기간 이동 지문·중복 게시 시 본문과 생성 시각 보존을 실제 SQLite로 검사합니다. 기존 근거의 optional `trendingPeriod` 누락은 daily로 해석하며 DB 마이그레이션은 없습니다.
