@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { TrendingRepo } from './repository-types';
+import type { TrendingPeriod, TrendingRepo } from './repository-types';
 
 const paragraph = z.string().trim().min(10).max(1200);
 export const briefContentSchema = z.object({
@@ -37,6 +37,7 @@ export type BriefEvidence = {
   readmeSha: string | null;
   release: { name: string; publishedAt: string; body: string; url: string } | null;
   trending: TrendingRepo | null;
+  trendingPeriod?: TrendingPeriod;
   trendingFetchedAt: string | null;
   trendingStale: boolean;
   sources: { title: string; url: string }[];

@@ -31,6 +31,7 @@ export function RepositoryExplanation({ repository, embedded = false }: { reposi
     return () => controller.abort();
   }, [repository, attempt]);
   const evidence = data?.evidence;
+  const trendingPeriodLabel = { daily: '오늘', weekly: '이번 주', monthly: '이번 달' }[evidence?.trendingPeriod ?? 'daily'];
   const article = data?.article ? { ...data.article, content: uiCopy(data.article.content) } : null;
   return <>
     {!embedded && <Link href="/" className="text-button explanation-back"><ArrowLeft size={15}/> 트렌딩 목록</Link>}
@@ -39,7 +40,7 @@ export function RepositoryExplanation({ repository, embedded = false }: { reposi
     {data && !evidence && <div className="explanation-pending"><BookOpen size={22}/><div><h2>해설을 준비하고 있어요.</h2><p>아직 저장된 자료가 없습니다. 새 자료가 확인되면 이곳에 반영됩니다.</p><a className="text-button" href={`https://github.com/${repository}`} target="_blank" rel="noreferrer">GitHub 원본 살펴보기 <ArrowUpRight size={14}/></a></div></div>}
     {evidence && <article className={`explanation-page ${embedded ? 'embedded' : ''}`}>
       <header className="explanation-hero">
-        <div className="explanation-eyebrow"><span className="explanation-label"><BookOpen size={14}/> 오픈소스 해설</span>{evidence.trending && <span>GitHub Trending #{evidence.trending.rank}, 수집 시점 기준</span>}</div>
+        <div className="explanation-eyebrow"><span className="explanation-label"><BookOpen size={14}/> 오픈소스 해설</span>{evidence.trending && <span>GitHub Trending {trendingPeriodLabel} #{evidence.trending.rank}, 수집 시점 기준</span>}</div>
         <p className="explanation-owner">{evidence.id.split('/')[0]}</p>
         <h1>{evidence.id.split('/')[1]}</h1>
         <p className="explanation-tagline">{uiText(article?.content.tagline || evidence.description || '공식 저장소의 자료를 확인해 보세요.')}</p>
@@ -61,7 +62,7 @@ export function RepositoryExplanation({ repository, embedded = false }: { reposi
         {!article && evidence.readme && <details className="explanation-readme"><summary>공식 README 원문 살펴보기</summary><pre>{evidence.readme}</pre></details>}
       </section>
       <section id="panel-trending" role="tabpanel" aria-labelledby="tab-trending" hidden={section !== 'trending'} tabIndex={0} className="explanation-panel">
-        <div className="explanation-section"><h2><TrendingUp size={20}/>관심이 모이고 있다는 신호</h2>{evidence.trending ? <div className="explanation-trend-stats"><div><span>전체 언어 트렌딩 순위</span><strong>#{evidence.trending.rank}</strong></div><div><span>오늘 받은 스타</span><strong>{evidence.trending.today === null ? '미확인' : `+${evidence.trending.today.toLocaleString()}`}</strong></div><p>{evidence.trendingFetchedAt && `${checkedAt(evidence.trendingFetchedAt)} KST 수집`}{evidence.trendingStale ? ', 이전 수집 결과' : ''}</p></div> : <p>자료 수집 시점의 오늘 트렌딩 목록에는 없습니다.</p>}<p className="explanation-caveat">순위와 스타 증가는 관심의 신호입니다. 인기의 구체적인 원인이나 내 프로젝트와의 적합성을 입증하지는 않습니다.</p></div>
+        <div className="explanation-section"><h2><TrendingUp size={20}/>관심이 모이고 있다는 신호</h2>{evidence.trending ? <div className="explanation-trend-stats"><div><span>{trendingPeriodLabel} 전체 언어 트렌딩 순위</span><strong>#{evidence.trending.rank}</strong></div><div><span>{trendingPeriodLabel} 받은 스타</span><strong>{evidence.trending.today === null ? '미확인' : `+${evidence.trending.today.toLocaleString()}`}</strong></div><p>{evidence.trendingFetchedAt && `${checkedAt(evidence.trendingFetchedAt)} KST 수집`}{evidence.trendingStale ? ', 이전 수집 결과' : ''}</p></div> : <p>자료 수집 시점의 트렌딩 목록에는 없습니다.</p>}<p className="explanation-caveat">순위와 스타 증가는 관심의 신호입니다. 인기의 구체적인 원인이나 내 프로젝트와의 적합성을 입증하지는 않습니다.</p></div>
         <div className="explanation-section"><h2>어떤 점이 주목받을 수 있나요?</h2>{article ? <div className="explanation-reasons">{article.content.trendReasons.map((reason, index) => <div key={index}><span className={`explanation-reason-kind ${reason.kind}`}>{reason.kind === 'fact' ? '확인한 사실' : '근거를 바탕으로 한 추정'}</span><p>{reason.text}</p><div>{reason.sourceUrls.map((url, n) => <a key={url} href={url} target="_blank" rel="noreferrer">{uiText(evidence.sources.find(s => s.url === url)?.title ?? `근거 ${n + 1}`)} <ArrowUpRight size={12}/></a>)}</div></div>)}</div> : <p>트렌딩에 오른 구체적인 원인은 아직 확인되지 않았습니다. 스타 수치만으로 원인을 추정해 표시하지 않습니다.</p>}</div>
         {evidence.release && <div className="explanation-release"><span>확인한 공식 릴리스</span><a href={evidence.release.url} target="_blank" rel="noreferrer">{uiText(evidence.release.name)} <ArrowUpRight size={14}/></a><p>{checkedAt(evidence.release.publishedAt)} KST 발표. 발표와 트렌딩 사이의 인과관계는 별도 확인이 필요합니다.</p></div>}
       </section>

@@ -34,11 +34,14 @@ export async function collectBriefEvidence(id: string, snapshot: TrendingSnapsho
   if (release) sources.push({ title: `공식 릴리스, ${release.name}`, url: release.url });
   if (releaseResult.status === 'rejected') warnings.push('릴리스 자료를 확인하지 못했습니다.');
   const trending = snapshot?.repositories.find(r => r.id.toLowerCase() === metadata.full_name.toLowerCase()) ?? null;
-  if (trending) sources.push({ title: 'GitHub 오늘의 트렌딩', url: snapshot!.sourceUrl });
+  const since = snapshot ? new URL(snapshot.sourceUrl).searchParams.get('since') : null;
+  const trendingPeriod = since === 'weekly' || since === 'monthly' ? since : 'daily';
+  const periodLabel = { daily: '오늘의', weekly: '이번 주', monthly: '이번 달' }[trendingPeriod];
+  if (trending) sources.push({ title: `GitHub ${periodLabel} 트렌딩`, url: snapshot!.sourceUrl });
   return {
     id: metadata.full_name, description: metadata.description ?? '', language: metadata.language,
     stars: metadata.stargazers_count, license: metadata.license?.spdx_id ?? null,
-    readme, readmeSha, release, sources, trending,
+    readme, readmeSha, release, sources, trending, trendingPeriod,
     trendingFetchedAt: trending ? snapshot!.fetchedAt : null, trendingStale: snapshot?.stale ?? false,
     fetchedAt: new Date().toISOString(), warnings,
   };
@@ -56,7 +59,10 @@ export async function evidenceContentFingerprint(evidence: BriefEvidence) {
     id: evidence.id.toLowerCase(), description: evidence.description,
     language: evidence.language, license: evidence.license,
     readme: evidence.readme, readmeSha: evidence.readmeSha,
-    release: evidence.release, sources: evidence.sources.filter(source => source.url !== 'https://github.com/trending?since=daily'),
+    release: evidence.release, sources: evidence.sources.filter(source => {
+      const url = new URL(source.url);
+      return !(url.origin === 'https://github.com' && url.pathname === '/trending');
+    }),
     warnings: evidence.warnings,
   };
   const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(content)));

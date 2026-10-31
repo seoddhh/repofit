@@ -34,19 +34,28 @@ export async function collectEditorialQueue(input: unknown = {}) {
   const koreanDayStart = Math.floor((Date.now() + 9 * 3600000) / 86400000) * 86400000 - 9 * 3600000;
   const refreshAfter = parsed.refreshAfter ?? new Date(koreanDayStart).toISOString();
   if (Date.parse(refreshAfter) > Date.now()) throw new Error('갱신 기준 시각은 현재보다 미래일 수 없습니다.');
-  const snapshot = await getTrending();
-  if (snapshot.stale) throw new Error('최신 트렌딩을 수집하지 못했습니다. 이전 해설을 유지합니다.');
+  const periods = ['daily', 'weekly', 'monthly'] as const;
+  const snapshots = await Promise.all(periods.map(period => getTrending(period)));
+  if (snapshots.some(snapshot => snapshot.stale)) throw new Error('최신 트렌딩을 수집하지 못했습니다. 이전 해설을 유지합니다.');
+  // Prefer daily evidence for overlaps, then weekly, then monthly; write one brief per repository.
+  const targets = new Map<string, { id: string; snapshot: typeof snapshots[number] }>();
+  for (const snapshot of snapshots) {
+    for (const repo of snapshot.repositories) {
+      const id = repo.id.toLowerCase();
+      if (!targets.has(id)) targets.set(id, { id: repo.id, snapshot });
+    }
+  }
   const db = getDb();
-  const published = snapshot.repositories.length ? await db.select({ id: repositoryBriefs.id, evidence: repositoryBriefs.evidence }).from(repositoryBriefs).where(inArray(repositoryBriefs.id, snapshot.repositories.map(repo => repo.id.toLowerCase()))) : [];
+  const published = targets.size ? await db.select({ id: repositoryBriefs.id, evidence: repositoryBriefs.evidence }).from(repositoryBriefs).where(inArray(repositoryBriefs.id, [...targets.keys()])) : [];
   const articles = new Map(published.map(article => [article.id, article]));
   let unchangedRepositories = 0;
   const queue = [];
   const failures: { repository: string; error: string }[] = [];
-  for (const repo of snapshot.repositories) {
+  for (const repo of targets.values()) {
     if (queue.length >= 3) break;
     try {
       const cached = await db.select().from(editorialSources).where(eq(editorialSources.id, repo.id.toLowerCase())).get();
-      const evidence = cached && Date.now() - Date.parse(cached.fetchedAt) < 3600000 ? cached.evidence : await collectBriefEvidence(repo.id, snapshot);
+      const evidence = cached && Date.now() - Date.parse(cached.fetchedAt) < 3600000 ? cached.evidence : await collectBriefEvidence(repo.id, repo.snapshot);
       const article = articles.get(repo.id.toLowerCase());
       if (article && evidence.warnings.some(warning => !article.evidence.warnings.includes(warning))) throw new Error('자료 수집이 불완전합니다. 기존 해설을 유지합니다.');
       const fingerprint = await evidenceFingerprint(evidence);
@@ -58,7 +67,7 @@ export async function collectEditorialQueue(input: unknown = {}) {
       queue.push({ repository: evidence.id, fingerprint, evidence });
     } catch (error) { failures.push({ repository: repo.id, error: error instanceof Error ? error.message : '자료 수집 실패' }); }
   }
-  return { instructions: '변경 없는 레포는 검색 및 재작성하지 마세요. queue에 반환된 신규 및 자료 변경 항목만 작성하세요. 빈 큐이고 dueRepositories가 0이면 추가 조사 없이 종료하세요. refreshAfter는 호환용이며 재작성을 강제하지 않습니다. ' + editorialInstructions, queue, failures, fetchedAt: snapshot.fetchedAt, refreshAfter, changeDetection: 'source-content-v1', totalRepositories: snapshot.repositories.length, dueRepositories: snapshot.repositories.length - unchangedRepositories, freshRepositories: unchangedRepositories, unchangedRepositories };
+  return { instructions: '오늘 및 이번 주 및 이번 달 목록을 합쳐 저장소 이름의 대소문자를 구분하지 않고 중복을 제거했습니다. 기간 이동 및 순위 및 스타 수만 바뀐 레포는 검색 및 재작성하지 마세요. queue에 반환된 신규 및 자료 변경 항목만 작성하세요. 빈 큐이고 dueRepositories가 0이면 추가 조사 없이 종료하세요. refreshAfter는 호환용이며 재작성을 강제하지 않습니다. ' + editorialInstructions, queue, failures, fetchedAt: snapshots.map(snapshot => snapshot.fetchedAt).sort()[0], refreshAfter, changeDetection: 'source-content-v2', periods: snapshots.map((snapshot, index) => ({ period: periods[index], totalRepositories: snapshot.repositories.length, sourceUrl: snapshot.sourceUrl, fetchedAt: snapshot.fetchedAt })), totalRepositories: targets.size, dueRepositories: targets.size - unchangedRepositories, freshRepositories: unchangedRepositories, unchangedRepositories };
 }
 
 export async function publishBrief(input: unknown) {
@@ -70,6 +79,10 @@ export async function publishBrief(input: unknown) {
   if (Date.now() - Date.parse(source.fetchedAt) > 86400000) throw new Error('수집 자료가 하루 이상 지났습니다. 자료를 다시 수집해 주세요.');
   const allowedUrls = new Set(source.evidence.sources.map(s => s.url));
   if (parsed.content.trendReasons.some(r => r.sourceUrls.some(url => !allowedUrls.has(url)))) throw new Error('직접 수집한 출처만 인용할 수 있습니다.');
+  const existing = await db.select().from(repositoryBriefs).where(eq(repositoryBriefs.id, id)).get();
+  if (existing && await evidenceContentFingerprint(existing.evidence) === await evidenceContentFingerprint(source.evidence)) {
+    return { repository: id, generatedAt: existing.generatedAt, url: `/explore/${id}`, unchanged: true };
+  }
   const generatedAt = new Date().toISOString();
   const article = { id, fingerprint: source.fingerprint, evidence: source.evidence, content: parsed.content, generatedAt };
   await db.insert(repositoryBriefs).values(article).onConflictDoUpdate({ target: repositoryBriefs.id, set: article });
