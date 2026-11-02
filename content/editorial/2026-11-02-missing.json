@@ -1,5 +1,5 @@
 {
-  "status": "ready_for_owner_import",
+  "status": "published_verified",
   "researchedAt": "2026-11-02T00:30:20.406Z",
   "scope": "2026-11-02 현재 RepoFit의 세 기간 고유 43개 중 해설이 없는 21개. 기존 22개는 수정하지 않음.",
   "entries": [
@@ -1072,5 +1072,123 @@
         ]
       }
     }
-  ]
+  ],
+  "publication": {
+    "siteUrl": "https://repofit.seoddh.chatgpt.site",
+    "siteVersion": 18,
+    "deployedCommit": "d7aa5d3204f6e42a34b601f20b1f9ac82c03c78c",
+    "verifiedAt": "2026-11-02T00:47:08.631Z",
+    "newlyPublished": 21,
+    "existingPreserved": 22,
+    "totalWithBriefs": 43,
+    "dueRepositories": 0,
+    "failures": [],
+    "articles": [
+      {
+        "repository": "public-apis/public-apis",
+        "generatedAt": "2026-11-02T00:44:43.426Z",
+        "url": "https://repofit.seoddh.chatgpt.site/explore/public-apis/public-apis"
+      },
+      {
+        "repository": "cjpais/Handy",
+        "generatedAt": "2026-11-02T00:45:07.577Z",
+        "url": "https://repofit.seoddh.chatgpt.site/explore/cjpais/handy"
+      },
+      {
+        "repository": "kornia/kornia",
+        "generatedAt": "2026-11-02T00:45:09.610Z",
+        "url": "https://repofit.seoddh.chatgpt.site/explore/kornia/kornia"
+      },
+      {
+        "repository": "beenuar/AiSOC",
+        "generatedAt": "2026-11-02T00:45:11.858Z",
+        "url": "https://repofit.seoddh.chatgpt.site/explore/beenuar/aisoc"
+      },
+      {
+        "repository": "anomalyco/hex",
+        "generatedAt": "2026-11-02T00:45:13.908Z",
+        "url": "https://repofit.seoddh.chatgpt.site/explore/anomalyco/hex"
+      },
+      {
+        "repository": "patchy631/ai-engineering-hub",
+        "generatedAt": "2026-11-02T00:45:16.193Z",
+        "url": "https://repofit.seoddh.chatgpt.site/explore/patchy631/ai-engineering-hub"
+      },
+      {
+        "repository": "FlashML-org/FreeToken",
+        "generatedAt": "2026-11-02T00:45:18.482Z",
+        "url": "https://repofit.seoddh.chatgpt.site/explore/flashml-org/freetoken"
+      },
+      {
+        "repository": "hyprwm/Hyprland",
+        "generatedAt": "2026-11-02T00:45:30.476Z",
+        "url": "https://repofit.seoddh.chatgpt.site/explore/hyprwm/hyprland"
+      },
+      {
+        "repository": "multica-ai/andrej-karpathy-skills",
+        "generatedAt": "2026-11-02T00:45:34.302Z",
+        "url": "https://repofit.seoddh.chatgpt.site/explore/multica-ai/andrej-karpathy-skills"
+      },
+      {
+        "repository": "jakubkrehel/skills",
+        "generatedAt": "2026-11-02T00:45:36.823Z",
+        "url": "https://repofit.seoddh.chatgpt.site/explore/jakubkrehel/skills"
+      },
+      {
+        "repository": "Leonxlnx/taste-skill",
+        "generatedAt": "2026-11-02T00:45:39.066Z",
+        "url": "https://repofit.seoddh.chatgpt.site/explore/leonxlnx/taste-skill"
+      },
+      {
+        "repository": "anthropics/skills",
+        "generatedAt": "2026-11-02T00:45:41.325Z",
+        "url": "https://repofit.seoddh.chatgpt.site/explore/anthropics/skills"
+      },
+      {
+        "repository": "YuJunZhiXue/dsh-purge",
+        "generatedAt": "2026-11-02T00:45:44.635Z",
+        "url": "https://repofit.seoddh.chatgpt.site/explore/yujunzhixue/dsh-purge"
+      },
+      {
+        "repository": "ghostty-org/ghostty",
+        "generatedAt": "2026-11-02T00:45:46.924Z",
+        "url": "https://repofit.seoddh.chatgpt.site/explore/ghostty-org/ghostty"
+      },
+      {
+        "repository": "heygen-com/hyperframes",
+        "generatedAt": "2026-11-02T00:45:59.639Z",
+        "url": "https://repofit.seoddh.chatgpt.site/explore/heygen-com/hyperframes"
+      },
+      {
+        "repository": "earthtojake/text-to-cad",
+        "generatedAt": "2026-11-02T00:46:02.150Z",
+        "url": "https://repofit.seoddh.chatgpt.site/explore/earthtojake/text-to-cad"
+      },
+      {
+        "repository": "NationalSecurityAgency/ghidra",
+        "generatedAt": "2026-11-02T00:46:05.612Z",
+        "url": "https://repofit.seoddh.chatgpt.site/explore/nationalsecurityagency/ghidra"
+      },
+      {
+        "repository": "mksglu/context-mode",
+        "generatedAt": "2026-11-02T00:46:08.005Z",
+        "url": "https://repofit.seoddh.chatgpt.site/explore/mksglu/context-mode"
+      },
+      {
+        "repository": "flutter/flutter",
+        "generatedAt": "2026-11-02T00:46:10.162Z",
+        "url": "https://repofit.seoddh.chatgpt.site/explore/flutter/flutter"
+      },
+      {
+        "repository": "vercel-labs/skills",
+        "generatedAt": "2026-11-02T00:46:12.486Z",
+        "url": "https://repofit.seoddh.chatgpt.site/explore/vercel-labs/skills"
+      },
+      {
+        "repository": "tashfeenahmed/freellmapi",
+        "generatedAt": "2026-11-02T00:46:14.771Z",
+        "url": "https://repofit.seoddh.chatgpt.site/explore/tashfeenahmed/freellmapi"
+      }
+    ]
+  }
 }
