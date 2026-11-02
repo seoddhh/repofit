@@ -11,7 +11,7 @@ export function EditorialBridge() {
     async function rpc(method: string, params?: unknown) {
       const response = await fetch('/api/editorial', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: lifecycle.signal, body: JSON.stringify({ jsonrpc: '2.0', id: crypto.randomUUID(), method, params }) });
       if (!response.ok) throw new Error('해설 도구에 연결하지 못했습니다.');
-      return await response.json() as { result?: { tools?: { name: string; description: string; inputSchema: object }[]; isError?: boolean; content?: { type: string; text: string }[] }; error?: { message: string } };
+      return await response.json() as { result?: { tools?: { name: string; description: string; inputSchema: object; annotations?: { readOnlyHint?: boolean } }[]; isError?: boolean; content?: { type: string; text: string }[] }; error?: { message: string } };
     }
     void (async () => {
       try {
@@ -20,7 +20,7 @@ export function EditorialBridge() {
           if (lifecycle.signal.aborted) return;
           await registry!.registerTool({
             ...tool, name: `repofit_editorial_${tool.name}`,
-            annotations: { readOnlyHint: ['read_repository_brief', 'read_skill_catalog'].includes(tool.name), untrustedContentHint: true },
+            annotations: { readOnlyHint: tool.annotations?.readOnlyHint ?? ['read_repository_brief', 'read_skill_catalog'].includes(tool.name), untrustedContentHint: true },
             async execute(input) {
               const result = await rpc('tools/call', { name: tool.name, arguments: input });
               if (tool.name === 'publish_repository_brief' && !result.result?.isError && !result.error) window.dispatchEvent(new Event('repofit-brief-updated'));

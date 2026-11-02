@@ -5,6 +5,9 @@ import { publishBriefSchema } from '@/lib/brief-types';
 import { repositoryId } from '@/lib/repository-types';
 import { getSkillCatalogQueue, publishSkillExplanation, readSkillCatalog } from '@/lib/catalog-store';
 import { categoryLabels } from '@/lib/catalog-types';
+import { callUsageTool, usageTools, usageServerInstructions } from '@/lib/usage-mcp';
+import { LocalAgentError } from '@/lib/local-agent-store';
+import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
 const explanationFields = {
@@ -60,19 +63,32 @@ tools.push({
 export async function POST(request: Request) {
   const respond = (value: unknown, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'no-store' } });
   let message: { id?: string | number | null; method?: string; params?: { name?: string; arguments?: unknown } };
+  let bytes = 0;
   try {
     const body = await request.text();
-    if (body.length > 40000) return respond({ error: '요청이 너무 큽니다.' }, 413);
+    bytes = new TextEncoder().encode(body).byteLength;
+    if (bytes > 100000) return respond({ error: '요청이 너무 큽니다.' }, 413);
     message = JSON.parse(body);
+    if (bytes > 40000 && message?.params?.name !== 'submit_usage_analysis') return respond({ error: '요청이 너무 큽니다.' }, 413);
     if (!message || typeof message !== 'object') throw new Error();
-  } catch { return respond({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Invalid JSON' } }, 400); }
+  } catch { return bytes > 40000 ? respond({ error: '요청이 너무 큽니다.' }, 413) : respond({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Invalid JSON' } }, 400); }
   const id = message.id ?? null;
   if (message.method === 'server/discover') return respond({ jsonrpc: '2.0', id, result: { supportedVersions: ['2026-07-28'], capabilities: { tools: {} }, serverInfo: { name: 'RepoFit Editorial', version: '1.0.0' } } });
-  if (message.method === 'initialize') return respond({ jsonrpc: '2.0', id, result: { protocolVersion: '2025-03-26', capabilities: { tools: {} }, serverInfo: { name: 'RepoFit Editorial', version: '1.0.0' } } });
+  if (message.method === 'initialize') return respond({ jsonrpc: '2.0', id, result: { protocolVersion: '2025-03-26', capabilities: { tools: {} }, serverInfo: { name: 'RepoFit', version: '2.0.0' }, instructions: usageServerInstructions } });
   if (message.method === 'notifications/initialized') return new Response(null, { status: 204 });
-  if (message.method === 'tools/list') return respond({ jsonrpc: '2.0', id, result: { tools: tools.map(tool => ({ ...tool, annotations: { readOnlyHint: ['read_repository_brief', 'read_skill_catalog'].includes(tool.name), untrustedContentHint: true } })) } });
+  if (message.method === 'tools/list') return respond({ jsonrpc: '2.0', id, result: { tools: [...tools.map(tool => ({ ...tool, annotations: { readOnlyHint: ['read_repository_brief', 'read_skill_catalog'].includes(tool.name), untrustedContentHint: true } })), ...usageTools] } });
   if (message.method !== 'tools/call') return respond({ jsonrpc: '2.0', id, error: { code: -32601, message: 'Method not found' } });
   const name = message.params?.name;
+  if (usageTools.some(tool => tool.name === name)) {
+    try {
+      if (['request_usage_analysis', 'start_usage_analysis', 'submit_usage_analysis'].includes(name!) && request.headers.has('origin') && request.headers.get('origin') !== new URL(request.url).origin) throw new LocalAgentError('허용되지 않은 요청입니다.', 403);
+      const user = await getChatGPTUser();
+      const data = await callUsageTool(name!, message.params?.arguments ?? {}, { userId: user?.userId });
+      return respond({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: JSON.stringify(data) }] } });
+    } catch (error) {
+      return respond({ jsonrpc: '2.0', id, result: { isError: true, content: [{ type: 'text', text: error instanceof LocalAgentError ? error.message : error instanceof z.ZodError ? '분석 요청 형식을 확인해 주세요.' : '활용 분석을 처리하지 못했습니다.' }] } });
+    }
+  }
   if (!tools.some(tool => tool.name === name)) return respond({ jsonrpc: '2.0', id, error: { code: -32602, message: 'Unknown tool' } });
   if (!['read_repository_brief', 'read_skill_catalog'].includes(name!)) {
     const user = await getChatGPTUser();

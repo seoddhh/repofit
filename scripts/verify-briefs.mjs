@@ -182,6 +182,9 @@ try {
   // Exercise the real MCP route with authenticated identity and storage stubs.
   writeFileSync(join(temporary, 'test-env.js'), 'exports.env = { REPOFIT_EDITOR_EMAIL: "owner@example.test" };');
   writeFileSync(join(temporary, 'test-auth.js'), 'exports.getChatGPTUser = async () => globalThis.__briefUser;');
+  // Usage MCP has its own integration suite; this suite isolates editorial access.
+  writeFileSync(join(temporary, 'lib/usage-mcp.js'), 'exports.usageTools = []; exports.usageServerInstructions = "";');
+  writeFileSync(join(temporary, 'lib/local-agent-store.js'), 'exports.LocalAgentError = class extends Error {};');
   compile('app/mcp/route.ts', 'mcp.js', s => s.replaceAll("'cloudflare:workers'", "'./test-env'").replaceAll("'@/app/chatgpt-auth'", "'./test-auth'").replaceAll("'@/lib/", "'./lib/"));
   const { POST } = require(join(temporary, 'mcp.js'));
   const call = (name, args = {}) => POST(new Request('https://repofit.test/mcp', { method: 'POST', body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) })).then(r => r.json());

@@ -20,8 +20,10 @@ try {
   writeFileSync(join(dir, 'auth.js'), 'exports.getChatGPTUser = async () => globalThis.__usageUser;');
   writeFileSync(join(dir, 'lib/catalog-store.js'), 'exports.readSkillCatalog = async () => globalThis.__usageCatalog;');
   for (const name of ['analysis.schema.json', 'report.schema.json']) writeFileSync(join(dir, 'public/skills/repofit-usage-analysis', name), readFileSync(`public/skills/repofit-usage-analysis/${name}`));
+  compile('lib/usage-mcp.ts', 'lib/usage-mcp.js', s => s.replace(/import instructions from [^;]+;/, `const instructions = ${JSON.stringify(readFileSync('public/skills/repofit-usage-analysis/SKILL.md', 'utf8'))};`));
   const routeImports = s => s.replaceAll('@/app/chatgpt-auth', '../auth').replaceAll('@/lib/', '../lib/');
   compile('app/api/usage-analysis/route.ts', 'routes/owner.js', routeImports);
+  compile('app/api/local-agent/usage-mcp/route.ts', 'routes/device.js', routeImports);
   database = new DatabaseSync(':memory:');
   for (const file of readdirSync('drizzle').filter(f => f.endsWith('.sql')).sort()) {
     if (file.startsWith('0008_')) database.exec(`INSERT INTO agent_usage_runs (id,user_id,device_id,goal,selected_skill_ids,status,created_at,updated_at,expires_at,message,candidates,report) VALUES ('migration-fixture','fixture-owner','fixture-device','','[]','completed','2026-01-01','2026-01-01','2099-01-01','saved report','[]','{"summary":"preserved"}')`);
@@ -40,7 +42,9 @@ try {
   globalThis.__usageDb = require('drizzle-orm/d1').drizzle(d1);
   const store = require(join(dir, 'lib/usage-store.js'));
   const devices = require(join(dir, 'lib/local-agent-store.js'));
+  const mcp = require(join(dir, 'lib/usage-mcp.js'));
   const owner = require(join(dir, 'routes/owner.js'));
+  const deviceRoute = require(join(dir, 'routes/device.js'));
   const types = require(join(dir, 'lib/usage-types.js'));
   const sentence = '공식 원문에서 확인한 코드 검증과 반복 작업에 대한 설명입니다.';
   const entry = (slug, availability = 'active') => ({ id: `acme/skills/${slug}`, name: slug, slug, source: 'acme/skills', url: `https://skills.sh/acme/skills/${slug}`, availability, checkedAt: new Date().toISOString(), contentHash: 'a'.repeat(64), installs: 10, explanation: { category: 'debugging', workKinds: ['coding', 'debugging'], tagline: sentence, summary: `testing ${slug} ${sentence}`, capabilities: ['testing'], problems: [sentence], steps: [sentence], benefits: [sentence], requirements: [sentence], limitations: [sentence] } });
@@ -80,6 +84,7 @@ try {
   await assert.rejects(() => store.updateUsageRun(a.token, { action: 'prepare', id: job.id, lease: job.lease, analysis, coverage }), /이미 분석/);
   const report = { summary: '검증 기준이 필요한 작업에서 이 스킬을 비교해 볼 수 있습니다.', habits: [], recommendations: [{ catalogSkillId: 'acme/skills/testing', reason: '확인한 검증 요청과 후보의 검증 절차가 관련 있습니다.', patternIds: ['pattern-1'], overlap: '기존 목록에서 같은 스킬은 확인하지 못했습니다.', prerequisites: [sentence], steps: [sentence], examplePrompt: '이 작업의 완료 조건에 맞는 검증 항목을 정리해 줘.', expectedBenefits: [sentence], checks: [sentence] }], unmetNeeds: [], limitations: ['실제 실행 호환성은 확인하지 않았습니다.'] };
   // A direct agent needs no device, goal, questionnaire, or selected skills.
+  await assert.rejects(() => mcp.callUsageTool('start_usage_analysis', { consent: true }, {}), /로그인/);
   await assert.rejects(() => store.createAgentUsageRun('direct-user', { consent: false }));
   await assert.rejects(() => store.createAgentUsageRun('direct-user', { consent: true, goal: 'condition' }));
   const direct = await store.createAgentUsageRun('direct-user', { consent: true });
@@ -95,11 +100,12 @@ try {
   assert.equal(directPrepared.coverage.verification, 'agent_reported', 'Direct-agent evidence is not claimed as locally verified');
   assert.ok(directPrepared.candidates.some(c => c.id === 'acme/skills/testing'));
   await assert.rejects(() => store.updateAgentUsageRun('direct-user', { id: direct.id, expectedRevision: started.revision, action: 'complete', report }), /상태/);
-  const directDone = await store.updateAgentUsageRun('direct-user', { id: direct.id, expectedRevision: directPrepared.revision, action: 'complete', report });
+  const directDone = await mcp.callUsageTool('submit_usage_analysis', { id: direct.id, expectedRevision: directPrepared.revision, action: 'complete', report }, { userId: 'direct-user' });
   assert.equal(directDone.status, 'completed');
   await assert.rejects(() => store.updateAgentUsageRun('direct-user', { id: direct.id, expectedRevision: directDone.revision, action: 'complete', report }), /상태/);
-  const directNoHistory = { run: await store.startAgentUsageRun('empty-agent', { consent: true }) };
-  assert.equal((await store.updateAgentUsageRun('empty-agent', { id: directNoHistory.run.id, expectedRevision: directNoHistory.run.revision, action: 'fail', reason: 'no_history' })).status, 'failed');
+  const directNoHistory = await mcp.callUsageTool('start_usage_analysis', { consent: true }, { userId: 'empty-agent' });
+  assert.ok(directNoHistory.instructions.includes('조건 입력 없이'));
+  assert.equal((await mcp.callUsageTool('submit_usage_analysis', { id: directNoHistory.run.id, expectedRevision: directNoHistory.run.revision, action: 'fail', reason: 'no_history' }, { userId: 'empty-agent' })).status, 'failed');
   const directCanceled = await store.startAgentUsageRun('cancel-agent', { consent: true });
   await store.cancelUsageRun('cancel-agent', directCanceled.id);
   await assert.rejects(() => store.updateAgentUsageRun('cancel-agent', { id: directCanceled.id, expectedRevision: directCanceled.revision, action: 'prepare', analysis, coverage }), /상태/);
@@ -113,6 +119,9 @@ try {
   assert.equal((await store.updateUsageRun(a.token, { action: 'complete', id: job.id, lease: job.lease, report })).active, false);
   assert.equal((await store.listUsageRuns('user-a')).length, 1, 'Stored result survives independent reads');
   assert.equal((await store.searchUsageSkills({ query: 'testing' })).skills.some(c => c.availability === 'deprecated'), false);
+  await assert.rejects(() => mcp.callUsageTool('list_usage_analyses', {}, {}), /로그인/);
+  assert.equal((await mcp.callUsageTool('get_usage_analysis', { id: run.id }, { userId: 'user-a' })).status, 'completed');
+  assert.ok((await mcp.callUsageTool('get_usage_analysis_instructions', {}, {})).instructions.includes('에이전트 활용 분석'));
   const request = (method, body, origin = 'https://repofit.example') => new Request('https://repofit.example/api/usage-analysis', { method, headers: { origin, 'content-type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
   globalThis.__usageUser = null;
   assert.equal((await owner.GET(request('GET'))).status, 401);
@@ -123,9 +132,23 @@ try {
   const fromWebsiteResponse = await owner.POST(request('POST', { consent: true }));
   assert.equal(fromWebsiteResponse.status, 201);
   const fromWebsite = await fromWebsiteResponse.json(); assert.equal(fromWebsite.executor, 'agent'); assert.equal(fromWebsite.status, 'queued');
-  const websiteStarted = { run: await store.startAgentUsageRun('website-agent-user', { id: fromWebsite.id, consent: true }) };
+  const websiteStarted = await mcp.callUsageTool('start_usage_analysis', { id: fromWebsite.id, consent: true }, { userId: 'website-agent-user' });
   assert.equal(websiteStarted.run.status, 'running', 'Only an agent tool invocation starts analysis');
   globalThis.__usageUser = { userId: 'user-a', email: 'ordinary@example.test' };
+  const callDevice = (token, name, args = {}) => deviceRoute.POST(new Request('https://repofit.example/api/local-agent/usage-mcp', { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) }));
+  assert.equal((await callDevice('invalid', 'claim_usage_analysis')).status, 401);
+  assert.equal((await callDevice(a.token, 'get_usage_analysis', { id: run.id })).status, 403, 'Device bridge cannot access arbitrary user tools');
+  assert.ok(JSON.parse((await (await callDevice(a.token, 'search_usage_skills', { query: 'testing' })).json()).result.content[0].text).skills.length);
+  // The public Sites endpoint routes ordinary authenticated users before the
+  // editorial owner check. Isolate unrelated editorial dependencies here.
+  for (const name of ['brief-store', 'brief-types', 'repository-types', 'catalog-types']) writeFileSync(join(dir, `lib/${name}.js`), name === 'brief-types' ? 'exports.publishBriefSchema = { shape: { content: { shape: {} } } };' : name === 'catalog-types' ? 'exports.categoryLabels = {};' : '');
+  writeFileSync(join(dir, 'env.js'), 'exports.env = { REPOFIT_EDITOR_EMAIL: "owner@example.test" };');
+  compile('app/mcp/route.ts', 'routes/mcp.js', s => routeImports(s).replace('cloudflare:workers', '../env'));
+  const publicMcp = require(join(dir, 'routes/mcp.js'));
+  const callPublic = args => publicMcp.POST(new Request('https://repofit.example/mcp', { method: 'POST', body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'get_usage_analysis', arguments: args } }) })).then(r => r.json());
+  assert.equal((await callPublic({ id: run.id })).result.isError, undefined, 'Ordinary users can read their usage result');
+  globalThis.__usageUser = { userId: 'user-b' };
+  assert.equal((await callPublic({ id: run.id })).result.isError, true);
   await store.deleteUsageRun('user-a', run.id);
   const unsupportedRun = await store.createUsageRun('user-a', { ...body, selectedSkillIds: [] });
   const unsupportedJob = (await store.claimUsageRun(a.token)).job;
@@ -156,7 +179,7 @@ try {
   const maximumPrepareBytes = Buffer.byteLength(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'update_usage_analysis', arguments: { action: 'prepare', id: job.id, lease: job.lease, analysis: largest, coverage } } }));
   assert.ok(maximumPrepareBytes < 100000, 'Bounded assessment output fits the existing MCP byte cap');
   assert.ok(ajv.compile(JSON.parse(readFileSync('public/skills/repofit-usage-analysis/report.schema.json', 'utf8')))(report));
-  console.log("통과: 사용자·기기 소유권·동의·단일 실행·분석 저장·상태·마이그레이션과 스키마");
+  console.log("통과: 분석 저장·동의·소유권·상태·마이그레이션·스키마와 실제 MCP 라우팅");
 } finally {
   database?.close(); delete globalThis.__usageDb; delete globalThis.__usageUser; delete globalThis.__usageCatalog;
   rmSync(dir, { recursive: true, force: true });
