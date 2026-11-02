@@ -17,7 +17,7 @@ async function api<T>(method = 'GET', data?: unknown): Promise<T> {
   return result;
 }
 
-export function LocalAgentInventory({ onSelection }: { onSelection?: (device: LocalDevice | undefined, agentId: 'codex' | 'claude') => void } = {}) {
+export function LocalAgentInventory({ onSelection, usageAnalysis = false }: { onSelection?: (device: LocalDevice | undefined, agentId: 'codex' | 'claude') => void; usageAnalysis?: boolean } = {}) {
   const [devices, setDevices] = useState<LocalDevice[]>([]);
   const [selected, setSelected] = useState('');
   const [agentId, setAgentId] = useState<'codex' | 'claude'>('codex');
@@ -76,11 +76,12 @@ export function LocalAgentInventory({ onSelection }: { onSelection?: (device: Lo
   const active = (skill: LocalSkill) => !['disabled', 'shadowed'].includes(skill.status);
   const skills = (agent?.skills ?? []).filter(skill => (showInactive || active(skill)) && `${uiText(skill.name)} ${skill.description} ${skill.plugin ?? ''}`.toLowerCase().includes(query.toLowerCase()));
   const online = device?.lastSeenAt && now - Date.parse(device.lastSeenAt) < 150000;
-  const command = `npm run local-agent -- --site ${shellQuote(origin)} --agent codex`;
+  const command = `npm run local-agent -- --site ${shellQuote(origin)} --agent codex${usageAnalysis ? ' --usage-analysis' : ''}`;
 
   return <section className="surface local-inventory" aria-labelledby="local-inventory-title">
     <div className="section-heading"><div><div className="eyebrow">내 Mac의 실제 구성</div><h2 id="local-inventory-title"><Laptop size={20}/> 연결된 스킬 목록</h2></div><div className="local-toolbar"><button className="icon-button" aria-label="기기 목록 다시 조회" onClick={() => void refresh()} disabled={loading || busy}><RefreshCw size={16}/></button><button className="primary-button" onClick={() => void connect()} disabled={loading || busy || loginRequired || Boolean(pairing && now < Date.parse(pairing.expiresAt))}>{busy ? <LoaderCircle size={16} className="spin"/> : <PlugZap size={16}/>} Mac 연결</button></div></div>
     <p className="local-intro">프로젝트 없이 개인 Codex를 연결하세요. 스킬 목록은 연결 프로그램이 켜져 있는 동안 60초마다 갱신합니다.</p>
+    {usageAnalysis && <p className="field-hint">활용 분석 연결입니다. 사이트에서 분석을 요청하면 최근 대화 최대 10개의 일부를 로컬에서 읽어 새 Codex로 분석합니다. 모델 서비스에는 입력이 전달될 수 있으며 사이트에는 요약과 결과를 저장합니다.</p>}
     {error && <p className="field-error" role="alert">{error}</p>}
     {loginRequired && <a className="secondary-button" href={chatGPTSignInPath('/agent')} target="_top">로그인하고 Mac 연결하기</a>}
     {loading && <p role="status"><LoaderCircle size={16} className="spin"/> 연결된 기기를 확인하고 있습니다.</p>}

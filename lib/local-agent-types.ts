@@ -17,9 +17,11 @@ const runtimeSchema = z.object({
   skills: z.array(localSkillSchema).max(1000), warnings: z.array(z.string().max(500)).max(30),
 }).strict();
 export const localInventorySchema = z.union([z.object({
+  capabilities: z.array(z.literal('usage-analysis-v1')).max(1).optional(),
   protocolVersion: z.literal(1), observedAt: z.string().datetime(),
   project: projectSchema, agents: z.array(runtimeSchema).length(2),
 }).strict(), z.object({
+  capabilities: z.array(z.literal('usage-analysis-v1')).max(1).optional(),
   protocolVersion: z.literal(2), observedAt: z.string().datetime(),
   profileId: z.string().uuid(), context: z.object({ kind: z.literal('personal') }).strict(),
   project: z.null(), agents: z.array(runtimeSchema).min(1).max(2),

@@ -69,3 +69,50 @@ export async function selectHistory(workspace, question, signal, executable = 'c
   if ((await question('이 요약을 사이트에 30일간 보관하고 분석에 사용할까요? (y/N): ')).trim().toLowerCase() !== 'y') return null;
   return summary;
 }
+
+// The caller enables this only with --usage-analysis and a site-side recent-10
+// request. Conversation items stay local; only validated pattern summaries leave.
+export async function recentUsageHistory(workspace, signal, executable = 'codex') {
+  return withHistoryReader(workspace, async request => {
+    const listing = await request('thread/list', { limit: 10, sourceKinds: ['cli', 'vscode', 'exec', 'appServer'], sortKey: 'updated_at', sortDirection: 'desc', useStateDbOnly: true });
+    const threads = [...new Map((listing?.data ?? []).filter(t => typeof t.id === 'string').map(t => [t.id, t])).values()].slice(0, 10);
+    const cases = []; const warnings = []; let truncated = Boolean(listing?.nextCursor);
+    for (const thread of threads) {
+      signal?.throwIfAborted();
+      try {
+        const result = await request('thread/items/list', { threadId: thread.id, limit: 200, sortDirection: 'desc' });
+        const items = (result.data ?? []).slice(0, 200).flatMap((entry, index) => {
+          const item = entry.item ?? entry;
+          if (item.type === 'userMessage' || item.type === 'agentMessage') {
+            const text = item.type === 'agentMessage' ? String(item.text ?? '') : (item.content ?? []).filter(p => p.type === 'text').map(p => p.text).join('\n');
+            return text.trim() ? [{ index, type: item.type === 'userMessage' ? 'user_request' : 'agent_response', text: redactUsageText(text).slice(0, 1200) }] : [];
+          }
+          if (item.type === 'commandExecution') return [{ index, type: 'command', command: redactUsageText(String(item.command ?? '')).slice(0, 400), exitCode: Number.isInteger(item.exitCode) ? item.exitCode : null }];
+          if (item.type === 'mcpToolCall') return [{ index, type: 'tool', tool: String(item.tool ?? '').slice(0, 100), status: String(item.status ?? '').slice(0, 30) }];
+          return [];
+        });
+        if (!items.length) continue;
+        const caseId = `case-${cases.length + 1}`;
+        let bytes = 0;
+        const samples = items.slice(0, 40).flatMap(({ index, ...item }) => {
+          const sample = { id: `${caseId}-item-${index}`, ...item };
+          const size = JSON.stringify(sample).length;
+          if (bytes + size > 6000) { truncated = true; return []; }
+          bytes += size; return [sample];
+        }).reverse();
+        if (!samples.length) continue;
+        truncated ||= Boolean(result.nextCursor) || items.length > samples.length;
+        cases.push({ id: caseId, samples });
+      } catch (error) {
+        if (signal?.aborted) throw error;
+        warnings.push('일부 대화는 읽지 못해 분석 범위에서 제외했습니다.');
+      }
+    }
+    return { cases, coverage: { observedAt: new Date().toISOString(), threadsRead: cases.length, itemsRead: cases.reduce((n, c) => n + c.samples.length, 0), truncated, warnings: [...new Set(warnings)] } };
+  }, executable);
+}
+export function redactUsageText(text) {
+  return text.replace(/\b(?:sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/g, '[인증값 제거]')
+    .replace(/(authorization\s*[:=]\s*(?:bearer\s+)?)[^\s"']+/gi, '$1[인증값 제거]')
+    .replace(/([A-Z][A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|API_KEY)\s*=\s*)[^\s]+/g, '$1[인증값 제거]');
+}

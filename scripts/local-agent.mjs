@@ -5,11 +5,13 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { collectInventory, personalWorkspace } from './local-agent/inventory.mjs';
 import { runCoach } from './local-agent/coach.mjs';
 import { selectHistory } from './local-agent/history.mjs';
+import { runUsageJob } from './local-agent/usage.mjs';
 
 const help = `RepoFit Mac 연결 (Node.js 22.13+)
   npm run local-agent -- --site http://localhost:5173 --agent codex
   npm run local-agent -- --agent codex --inspect
   npm run local-agent -- --site http://localhost:5173 --agent codex --select-history
+  npm run local-agent -- --site http://localhost:5173 --agent codex --usage-analysis
   npm run local-agent -- --site http://localhost:5173 --project .
 
 연결 코드는 실행 후 터미널에 입력합니다. 사이트 /agent에서 코드를 만드세요.
@@ -29,10 +31,12 @@ async function main() {
     'service-token-env': { type: 'string' },
     agent: { type: 'string', default: 'codex' },
     'select-history': { type: 'boolean' },
+    'usage-analysis': { type: 'boolean' },
   } });
   if (values.help) { console.log(help); return; }
   if (!['codex', 'claude', 'all'].includes(values.agent)) throw new Error('--agent는 codex, claude, all 중 하나를 선택하세요.');
-  const collect = () => collectInventory(values.project, { agent: values.agent });
+  if (values['usage-analysis'] && values.agent === 'claude') throw new Error('최근 대화 활용 분석은 Codex 연결에서 지원합니다.');
+  const collect = async () => ({ ...await collectInventory(values.project, { agent: values.agent }), ...(values['usage-analysis'] ? { capabilities: ['usage-analysis-v1'] } : {}) });
   if (values.inspect) { console.log(JSON.stringify(await collect(), null, 2)); return; }
   if (!values.site) throw new Error('--site로 연결할 RepoFit 주소를 지정하세요.');
   const site = new URL(values.site);
@@ -60,6 +64,7 @@ async function main() {
     return data;
   };
   const inventory = await collect();
+  if (values['usage-analysis']) console.log('활용 분석 연결: 사이트에서 분석을 요청할 때마다 최근 Codex 대화 최대 10개의 요청·응답·명령 정보 일부를 새 Codex 실행에 전달합니다. 원문은 모델 서비스에 전달될 수 있으며 RepoFit에는 근거 요약과 보고서만 30일 저장합니다.');
   const connection = await call('/api/local-agent/connect', { code, name: (values.name ?? hostname()).slice(0, 200) });
   if (!/^[a-f0-9]{48}$/.test(connection.token)) throw new Error('서버가 기기 토큰을 반환하지 않았습니다.');
   if (values['select-history']) {
@@ -73,6 +78,33 @@ async function main() {
   console.log(`${inventory.project?.name ?? '개인 에이전트'} 연결 완료. 사이트의 내 에이전트에서 확인하세요. 종료: Ctrl+C`);
   let snapshot = inventory;
   let lastInventory = 0;
+  let sequence = 0;
+  const mcp = async (name, args = {}) => {
+    const result = await call('/api/local-agent/usage-mcp', { jsonrpc: '2.0', id: ++sequence, method: 'tools/call', params: { name, arguments: args } }, connection.token, 'POST');
+    if (result.error || result.result?.isError) throw new Error(result.result?.content?.find(c => c.type === 'text')?.text ?? result.error?.message ?? 'RepoFit MCP 호출에 실패했습니다.');
+    return JSON.parse(result.result.content.find(c => c.type === 'text').text);
+  };
+  const processUsage = async job => {
+    const canceled = new AbortController();
+    const signal = AbortSignal.any([controller.signal, canceled.signal]);
+    let checking = false;
+    const heartbeat = setInterval(async () => {
+      if (checking) return; checking = true;
+      try { if (!(await mcp('update_usage_analysis', { action: 'heartbeat', id: job.id, lease: job.lease })).active) canceled.abort(); }
+      catch { canceled.abort(); }
+      finally { checking = false; }
+    }, 10000);
+    try {
+      console.log('최근 대화에서 사용 방식을 분석하고 스킬을 비교합니다. 원문은 사이트로 보내지 않습니다.');
+      await runUsageJob({ job, workspace: await personalWorkspace(), inventory: snapshot, signal, mcp });
+      console.log('활용 분석과 스킬 추천을 사이트에 저장했습니다.');
+    } catch (error) {
+      if (!signal.aborted) {
+        console.error(error.message);
+        await mcp('update_usage_analysis', { action: 'fail', id: job.id, lease: job.lease, reason: error.usageReason ?? 'model_failed' }).catch(() => {});
+      }
+    } finally { clearInterval(heartbeat); }
+  };
   const processJob = async job => {
     const canceled = new AbortController();
     const signal = AbortSignal.any([controller.signal, canceled.signal]);
@@ -104,6 +136,7 @@ async function main() {
         console.log(`${new Date().toLocaleTimeString('ko-KR')} 목록 전달: ${snapshot.agents.map(agent => `${agent.id} ${agent.skills.length}개`).join(', ')}`);
       }
       if (!values.once && snapshot.agents.some(agent => agent.id === 'codex')) {
+        if (values['usage-analysis']) { const { job } = await mcp('claim_usage_analysis'); if (job) await processUsage(job); }
         const { job } = await call('/api/local-agent/jobs', undefined, connection.token, 'POST');
         if (job) await processJob(job);
       }

@@ -1,4 +1,5 @@
-import { index, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import type { UsageAnalysis, UsageCoverage, UsageReport, UsageCandidate } from '../lib/usage-types';
 import type { BriefContent, BriefEvidence } from '../lib/brief-types';
 import type { LocalInventory } from '../lib/local-agent-types';
 import type { ActivitySummary, CoachBundle, CoachNarrative, CoachReport } from '../lib/coach-types';
@@ -62,3 +63,18 @@ export const agentActivitySummaries = sqliteTable('agent_activity_summaries', {
   createdAt: text('created_at').notNull(), expiresAt: text('expires_at').notNull(),
   summary: text('summary', { mode: 'json' }).$type<ActivitySummary['summary']>().notNull(),
 }, table => [index('agent_activity_owner_expiry').on(table.userId, table.expiresAt)]);
+
+export const agentUsageRuns = sqliteTable('agent_usage_runs', {
+  id: text('id').primaryKey(), userId: text('user_id').notNull(), deviceId: text('device_id').notNull(),
+  goal: text('goal').notNull(), selectedSkillIds: text('selected_skill_ids', { mode: 'json' }).$type<string[]>().notNull(),
+  status: text('status').$type<'queued' | 'running' | 'completed' | 'failed' | 'canceled'>().notNull(),
+  revision: integer('revision').notNull().default(0),
+  createdAt: text('created_at').notNull(), updatedAt: text('updated_at').notNull(), expiresAt: text('expires_at').notNull(),
+  message: text('message').notNull(),
+  analysis: text('analysis', { mode: 'json' }).$type<UsageAnalysis>(),
+  coverage: text('coverage', { mode: 'json' }).$type<UsageCoverage>(),
+  candidates: text('candidates', { mode: 'json' }).$type<UsageCandidate[]>().notNull(),
+  report: text('report', { mode: 'json' }).$type<UsageReport>(),
+  leaseHash: text('lease_hash'), leaseExpiresAt: text('lease_expires_at'),
+  activeDeviceKey: text('active_device_key'),
+}, table => [index('agent_usage_owner_expiry').on(table.userId, table.expiresAt), index('agent_usage_device_status').on(table.deviceId, table.status), uniqueIndex('agent_usage_active_device').on(table.activeDeviceKey)]);

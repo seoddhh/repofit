@@ -50,6 +50,13 @@
       "when": 1793290119980,
       "tag": "0006_exotic_supreme_intelligence",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1793629049190,
+      "tag": "0007_quick_retro_girl",
+      "breakpoints": true
     }
   ]
 }
