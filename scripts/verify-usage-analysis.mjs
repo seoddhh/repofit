@@ -5,6 +5,8 @@ import { join, resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import { DatabaseSync } from 'node:sqlite';
 import ts from 'typescript';
+import { runUsageJob } from './local-agent/usage.mjs';
+import { recentUsageHistory, redactUsageText } from './local-agent/history.mjs';
 
 const dir = mkdtempSync(join(tmpdir(), 'repofit-usage-'));
 const require = createRequire(import.meta.url);
@@ -167,6 +169,37 @@ try {
   await devices.removeLocalDevice('user-a', a.deviceId);
   assert.equal((await store.getUsageRun('user-a', revoked.id)).status, 'canceled');
   await assert.rejects(() => store.updateUsageRun(a.token, { action: 'heartbeat', id: revoked.id, lease: revokeJob.lease }), /만료/);
+  const raw = 'PRIVATE_CONVERSATION_ONLY'; const sent = [];
+  const history = { cases: [{ id: 'case-1', samples: [{ id: 'case-1-item-0', type: 'user_request', text: raw }] }], coverage };
+  let generated = 0;
+  await runUsageJob({ job, workspace: dir, inventory, readHistory: async () => history, generate: async spec => {
+    generated++;
+    if (spec.schemaUrl.pathname.endsWith('analysis.schema.json')) return analysis;
+    assert.equal(spec.data.analysis.patterns[0].sourceIds, undefined);
+    assert.equal(spec.data.analysis.patterns[0].assessment.evidence, undefined, 'Do not send representative annotations to the second model again');
+    assert.equal(spec.data.analysis.patterns[0].assessment.status, assessment.status, 'Recommendation judgments retain their uncertainty');
+    return report;
+  }, mcp: async (name, args) => { sent.push({ name, args }); return { active: true, candidates: prepared.candidates }; } });
+  assert.equal(generated, 2); assert.equal(JSON.stringify(sent).includes(raw), false, 'Raw dialogue never crosses the Site MCP boundary');
+  assert.deepEqual(sent[0].args.analysis.patterns[0].assessment.evidence, assessment.evidence, 'Typed evidence summaries are preserved through MCP');
+  await assert.rejects(() => runUsageJob({ job, workspace: dir, inventory, readHistory: async () => history, generate: async () => ({ ...analysis, patterns: [{ ...analysis.patterns[0], sourceIds: ['case-9-item-1'] }] }), mcp: async () => { throw new Error('Should not transmit invented evidence'); } }), /읽지 않은/);
+  await assert.rejects(() => runUsageJob({ job, workspace: dir, inventory, readHistory: async () => history, generate: async () => ({ ...analysis, patterns: [{ ...analysis.patterns[0], assessment: { ...assessment, evidence: [{ ...assessment.evidence[0], kind: 'agent_response' }] } }] }), mcp: async () => { throw new Error('Must not transmit misattributed evidence'); } }), /구분이 원본과/);
+  await assert.rejects(() => runUsageJob({ job, workspace: dir, inventory, readHistory: async () => history, generate: async () => ({ ...analysis, patterns: [{ ...analysis.patterns[0], assessment: { ...assessment, evidence: [{ ...assessment.evidence[0], sourceId: 'case-1-item-99' }] } }] }), mcp: async () => { throw new Error('Must not transmit unrelated evidence'); } }), /대표 근거/);
+  await assert.rejects(() => runUsageJob({ job, workspace: dir, inventory, readHistory: async () => history, generate: async () => legacy, mcp: async () => { throw new Error('New runs need the current rubric'); } }), /판단 기준/);
+  for (const type of ['agent_response', 'command', 'tool']) {
+    const typedHistory = { ...history, cases: [{ id: 'case-1', samples: [{ id: 'case-1-item-0', type }] }] };
+    const typedAnalysis = { ...analysis, patterns: [{ ...analysis.patterns[0], assessment: { ...assessment, evidence: [{ ...assessment.evidence[0], kind: type }] } }] };
+    await runUsageJob({ job, workspace: dir, inventory, readHistory: async () => typedHistory, generate: async spec => spec.schemaUrl.pathname.endsWith('analysis.schema.json') ? typedAnalysis : report, mcp: async () => ({ active: true, candidates: prepared.candidates }) });
+  }
+  const noHistory = { cases: [], coverage: { ...coverage, threadsRead: 0, itemsRead: 0 } };
+  await assert.rejects(() => runUsageJob({ job, workspace: dir, inventory, readHistory: async () => noHistory, generate: async () => { throw new Error('Must not generate without evidence'); } }), /대화를 찾지/);
+  const fixture = join(dir, 'fake-codex');
+  writeFileSync(fixture, `#!${process.execPath}\nconst r=require('node:readline').createInterface({input:process.stdin});r.on('line',line=>{const m=JSON.parse(line);let result;if(m.method==='initialize')result={};if(m.method==='thread/list')result={data:Array.from({length:12},(_,i)=>({id:'thread-'+i}))};if(m.method==='thread/items/list')result={data:[{item:{type:'agentMessage',text:'Done'}},{item:{type:'userMessage',content:[{type:'text',text:'Please verify sk-abcdefghijklmnopqrstuvwxyz'}]}}]};if(result)console.log(JSON.stringify({id:m.id,result}));});\n`, { mode: 0o755 });
+  const collected = await recentUsageHistory(dir, new AbortController().signal, fixture);
+  assert.equal(collected.cases.length, 10); assert.equal(collected.coverage.itemsRead, 20);
+  assert.equal(collected.cases[0].samples[0].type, 'user_request', 'Keep dialogue in chronological order');
+  assert.equal(JSON.stringify(collected).includes('sk-abcdefghijklmnopqrstuvwxyz'), false);
+  assert.equal(redactUsageText('GITHUB_TOKEN=abc Authorization: Bearer value').includes('abc'), false);
   const ajv = new (require('ajv').default ?? require('ajv'))({ strict: false });
   const jsonSchema = JSON.parse(readFileSync('public/skills/repofit-usage-analysis/analysis.schema.json', 'utf8'));
   const validateAnalysis = ajv.compile(jsonSchema);
@@ -179,7 +212,7 @@ try {
   const maximumPrepareBytes = Buffer.byteLength(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'update_usage_analysis', arguments: { action: 'prepare', id: job.id, lease: job.lease, analysis: largest, coverage } } }));
   assert.ok(maximumPrepareBytes < 100000, 'Bounded assessment output fits the existing MCP byte cap');
   assert.ok(ajv.compile(JSON.parse(readFileSync('public/skills/repofit-usage-analysis/report.schema.json', 'utf8')))(report));
-  console.log("통과: 분석 저장·동의·소유권·상태·마이그레이션·스키마와 실제 MCP 라우팅");
+  console.log("통과: 분석 저장·MCP 라우팅·최근 기록 수집·근거 검증·로컬 두 단계 실행 계약");
 } finally {
   database?.close(); delete globalThis.__usageDb; delete globalThis.__usageUser; delete globalThis.__usageCatalog;
   rmSync(dir, { recursive: true, force: true });
