@@ -38,6 +38,7 @@ export const usageCoverageSchema = z.object({
   observedAt: z.string().datetime(), threadsRead: z.number().int().min(1).max(10),
   itemsRead: z.number().int().min(1).max(400), truncated: z.boolean(),
   warnings: z.array(z.string().max(500)).max(15),
+  verification: z.enum(['local_checked', 'agent_reported']).optional(),
 }).strict();
 export const usageReportSchema = z.object({
   summary: text,
@@ -56,12 +57,13 @@ export const usageRequestSchema = z.object({
   selectedSkillIds: z.array(z.string().min(1).max(600)).max(5).default([]),
   consent: z.literal(true), historyScope: z.literal('recent-10'),
 }).strict();
+export const agentUsageRequestSchema = z.object({ consent: z.literal(true) }).strict();
 export type UsageAnalysis = z.infer<typeof usageAnalysisSchema>;
 export type UsageCoverage = z.infer<typeof usageCoverageSchema>;
 export type UsageReport = z.infer<typeof usageReportSchema>;
 export type UsageCandidate = Pick<CatalogEntry, 'id' | 'name' | 'slug' | 'source' | 'url' | 'availability' | 'explanation' | 'checkedAt' | 'contentHash'>;
 export type UsageRun = {
-  id: string; deviceId: string; goal: string; selectedSkillIds: string[];
+  id: string; deviceId: string | null; executor: 'local' | 'agent'; goal: string; selectedSkillIds: string[];
   status: 'queued' | 'running' | 'completed' | 'failed' | 'canceled'; revision: number;
   createdAt: string; updatedAt: string; expiresAt: string; message: string;
   analysis: UsageAnalysis | null; coverage: UsageCoverage | null;

@@ -65,7 +65,8 @@ export const agentActivitySummaries = sqliteTable('agent_activity_summaries', {
 }, table => [index('agent_activity_owner_expiry').on(table.userId, table.expiresAt)]);
 
 export const agentUsageRuns = sqliteTable('agent_usage_runs', {
-  id: text('id').primaryKey(), userId: text('user_id').notNull(), deviceId: text('device_id').notNull(),
+  id: text('id').primaryKey(), userId: text('user_id').notNull(), deviceId: text('device_id'),
+  executor: text('executor').$type<'local' | 'agent'>().notNull().default('local'),
   goal: text('goal').notNull(), selectedSkillIds: text('selected_skill_ids', { mode: 'json' }).$type<string[]>().notNull(),
   status: text('status').$type<'queued' | 'running' | 'completed' | 'failed' | 'canceled'>().notNull(),
   revision: integer('revision').notNull().default(0),

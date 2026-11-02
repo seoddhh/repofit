@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { LocalAgentError } from '@/lib/local-agent-store';
 import { localBody, localJson, requireLocalOrigin } from '@/lib/local-agent-http';
-import { cancelUsageRun, createUsageRun, deleteUsageRun, getUsageRun, listUsageRuns } from '@/lib/usage-store';
+import { cancelUsageRun, createAgentUsageRun, deleteUsageRun, getUsageRun, listUsageRuns } from '@/lib/usage-store';
 
 export const dynamic = 'force-dynamic';
 async function owner() {
@@ -18,7 +18,7 @@ export async function GET(request: Request) {
   catch (error) { return failure(error); }
 }
 export async function POST(request: Request) {
-  try { requireLocalOrigin(request); return localJson(await createUsageRun(await owner(), await localBody(request, 8000)), 201); }
+  try { requireLocalOrigin(request); return localJson(await createAgentUsageRun(await owner(), await localBody(request, 1000)), 201); }
   catch (error) { return failure(error); }
 }
 export async function PATCH(request: Request) {

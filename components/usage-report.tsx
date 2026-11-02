@@ -12,6 +12,7 @@ const statuses = { confirmed_issue: '문제 확인', opportunity: '개선 가능
 const attributions = { user: '사용자 요청', agent: '에이전트 행동', environment: '도구·실행 환경', shared: '여러 구간', unknown: '원인 미확인' };
 const kinds = { user_request: '사용자 요청', agent_response: '에이전트 응답', command: '명령 실행', tool: '도구 호출' };
 const sourceLabel = (id: string) => { const [, c, , item] = id.split('-'); return `사례 ${c} · 항목 ${Number(item) + 1}`; };
+const verificationNote = (run: UsageRun) => run.executor === 'agent' ? '근거 유형과 요약은 사용자 에이전트가 보고한 내용이며, 서버가 대화 원문과 대조한 결과는 아닙니다.' : '근거의 유형은 로컬 항목과 대조하지만 요약과 원인 추정의 정확성을 독립적으로 검증한 결과는 아닙니다.';
 
 export function reportMarkdown(run: UsageRun) {
   return [`# 에이전트 활용 분석 보고서`, `작성: ${date(run.createdAt)} KST`, `확인 범위: ${run.coverage?.threadsRead ?? 0}개 대화, ${run.coverage?.itemsRead ?? 0}개 항목`, '', run.report?.summary ?? run.analysis?.summary ?? run.message,
@@ -25,7 +26,7 @@ export function reportMarkdown(run: UsageRun) {
     '', '## 추천 스킬과 적용 가이드', ...(run.report?.recommendations.flatMap((r, i) => { const c = run.candidates.find(c => c.id === r.catalogSkillId); return [`### ${i + 1}. ${c?.name ?? r.catalogSkillId}`, r.reason, `출처: ${c?.url ?? '미확인'}`, `원문 확인: ${c?.checkedAt ?? '미확인'}`, `기존 구성과의 관계: ${r.overlap}`, '준비 사항:', ...r.prerequisites.map(s => `- ${s}`), '적용 순서:', ...r.steps.map((s, n) => `${n + 1}. ${s}`), '요청 예시:', r.examplePrompt, '기대 변화 (예상):', ...r.expectedBenefits.map(s => `- ${s}`), '확인 기준:', ...r.checks.map(s => `- ${s}`), '']; }) ?? []),
     '', '## 현재 구성으로 시도할 방법', ...(run.report?.habits.flatMap(h => [`- ${h.action}`, `  예시: ${h.examplePrompt}`]) ?? []),
     '', '## 추가 확인이 필요한 기능', ...(run.report?.unmetNeeds.map(s => `- ${s}`) ?? []),
-    '', '## 확인 범위와 한계', `판단 기준: ${run.analysis?.rubricVersion ?? '이전 형식 (기준 버전 미기록)'}`, '사용자 환경의 Codex가 작성한 분석입니다. 근거의 유형은 로컬 항목과 대조하지만 요약과 원인 추정의 정확성을 독립적으로 검증한 결과는 아닙니다. 실행 호환성과 기대 효과는 별도 확인이 필요합니다.', ...[...(run.coverage?.warnings ?? []), ...(run.analysis?.limitations ?? []), ...(run.report?.limitations ?? [])].map(s => `- ${s}`)].join('\n');
+    '', '## 확인 범위와 한계', `판단 기준: ${run.analysis?.rubricVersion ?? '이전 형식 (기준 버전 미기록)'}`, `${verificationNote(run)} 실행 호환성과 기대 효과는 별도 확인이 필요합니다.`, ...[...(run.coverage?.warnings ?? []), ...(run.analysis?.limitations ?? []), ...(run.report?.limitations ?? [])].map(s => `- ${s}`)].join('\n');
 }
 function Finding({ pattern: p, run, index }: { pattern: UsageAnalysis['patterns'][number]; run: UsageRun; index: number }) {
   const cases = new Set(p.sourceIds.map(id => id.split('-')[1]));
@@ -39,7 +40,7 @@ function Finding({ pattern: p, run, index }: { pattern: UsageAnalysis['patterns'
       <div className="usage-report-need"><h5><ArrowDown size={14}/> 필요한 기능</h5><p>{p.need}</p>{related.length > 0 && <div className="usage-report-related">{related.map(r => <span key={r.catalogSkillId}><BookOpen size={13}/>{run.candidates.find(c => c.id === r.catalogSkillId)?.name}</span>)}</div>}</div>
       <details className="usage-report-sources"><summary>{a ? `대표 근거 ${a.evidence.length}개와 항목 유형` : `확인한 근거 항목 ${p.sourceIds.length}개`} <ChevronDown size={13}/></summary>
         {a ? <ol className="usage-report-evidence">{a.evidence.map(e => <li key={e.sourceId}><div><strong>{kinds[e.kind]}</strong><span>{sourceLabel(e.sourceId)}</span></div><p>{e.summary}</p></li>)}</ol> : <div>{p.sourceIds.map(id => <span key={id}>{sourceLabel(id)}</span>)}</div>}
-        <p>원문을 저장하지 않은 로컬 추출 항목의 식별자입니다. 원문으로 이동하는 링크가 아니며, 요약과 원인 추정은 모델의 해석입니다.</p>
+        <p>분석에서 사용한 임시 항목 식별자입니다. 원문으로 이동하는 링크가 아니며, 요약과 원인 추정은 모델의 해석입니다.</p>
       </details>
     </div>
   </details>;
@@ -75,13 +76,13 @@ export function UsageReport({ run, busy, onCancel, onNew }: { run: UsageRun; bus
   const summary = run.report?.summary ?? run.analysis?.summary;
   const patterns = run.analysis?.patterns ?? [];
   const recommendations = run.report?.recommendations ?? [];
-  const steps = [{ title: '최근 작업 확인', note: '읽을 수 있는 대화 사례 수집' }, { title: '사용 방식 분석', note: '관찰과 필요한 기능 도출' }, { title: '스킬 적합성 검토', note: '추천 근거와 활용 가이드 작성' }];
+  const steps = [{ title: '분석 스킬 실행', note: '접근 가능한 작업 기록 확인' }, { title: '사용 방식 분석', note: '관찰과 필요한 기능 도출' }, { title: '보고서 작성', note: '후보 적합성과 활용 가이드 작성' }];
   const currentStep = complete ? 3 : run.analysis ? 2 : run.status === 'running' ? 0 : -1;
   return <article className="usage-report" aria-labelledby="usage-report-title">
     <header className="usage-report-header"><div className="usage-report-topline"><span><FileText size={15}/> REPOFIT · AGENT REPORT</span><span className={`usage-report-status ${complete ? 'complete' : ''}`}>{complete ? <CheckCircle2 size={14}/> : running ? <LoaderCircle size={14} className="spin"/> : <Clock3 size={14}/>}{{ queued: '분석 대기', running: '분석 중', completed: '분석 완료', failed: '분석 중단', canceled: '취소됨' }[run.status]}</span></div>
-      <h2 id="usage-report-title">나의 에이전트<br/>활용 분석 보고서</h2><p className="usage-report-subtitle">사용 방식에서 찾은 필요한 기능과 스킬 활용 가이드</p>
-      <div className="usage-report-meta"><span>{date(run.createdAt)} KST</span><span>내 Codex 작성</span></div>
-      <div className="usage-report-actions">{run.analysis && <button type="button" className="secondary-button" onClick={() => downloadText(`repofit-usage-${run.id}.md`, reportMarkdown(run), 'text/markdown;charset=utf-8')}><Download size={15}/> 보고서 내려받기</button>}<button type="button" className="text-button" onClick={onNew}>{running ? '분석 설정으로' : '새 분석 만들기'} <ArrowRight size={15}/></button></div>
+      <h2 id="usage-report-title">나의 에이전트<br/>{run.analysis ? '활용 분석 보고서' : '활용 분석 요청'}</h2><p className="usage-report-subtitle">{run.status === 'queued' && run.executor === 'agent' ? '요청 준비 완료 · 에이전트가 실행 요청을 받으면 시작됩니다.' : '사용 방식에서 찾은 필요한 기능과 스킬 활용 가이드'}</p>
+      <div className="usage-report-meta"><span>{date(run.createdAt)} KST</span><span>{run.executor === 'agent' ? '내 에이전트 실행' : '내 Codex 작성'}</span></div>
+      <div className="usage-report-actions">{run.analysis && <button type="button" className="secondary-button" onClick={() => downloadText(`repofit-usage-${run.id}.md`, reportMarkdown(run), 'text/markdown;charset=utf-8')}><Download size={15}/> 보고서 내려받기</button>}<button type="button" className="text-button" onClick={onNew}>{running ? '분석 안내 보기' : '새 분석 만들기'} <ArrowRight size={15}/></button></div>
     </header>
     <div className="usage-report-body">
       <div className="usage-report-metrics" aria-label="분석 범위와 결과"><div><span><ScanText size={15}/> 확인한 대화</span><strong>{run.coverage?.threadsRead ?? '—'}<small> / 최대 10개</small></strong></div><div><span><Layers3 size={15}/> 활용 방식 관찰</span><strong>{run.analysis ? patterns.length : '—'}<small>개</small></strong></div><div><span><BookOpen size={15}/> 추천 스킬</span><strong>{run.report ? recommendations.length : '—'}<small>개</small></strong></div></div>
@@ -100,7 +101,7 @@ export function UsageReport({ run, busy, onCancel, onNew }: { run: UsageRun; bus
         {run.report.habits.length > 0 && <section className="usage-report-section"><SectionTitle number="03" title="지금 구성으로 먼저 시도해 보세요" description="설치 없이도 적용할 수 있는 요청과 진행 방식입니다."/><div className="usage-report-habits">{run.report.habits.map((h, i) => <article key={i}><span className="usage-report-overline">실천 {String(i + 1).padStart(2, '0')}</span><h4>{h.action}</h4><CopyRequest text={h.examplePrompt}/></article>)}</div></section>}
         {run.report.unmetNeeds.length > 0 && <section className="usage-report-unmet"><h3>아직 답을 찾지 못한 부분</h3><ul>{run.report.unmetNeeds.map((s, i) => <li key={i}>{s}</li>)}</ul></section>}
       </>}
-      {run.analysis && <details className="usage-report-method"><summary><span><ShieldCheck size={17}/> 분석 근거와 확인 범위</span><ChevronDown size={16}/></summary><div><dl><div><dt>확인한 자료</dt><dd>{run.coverage?.threadsRead}개 대화, {run.coverage?.itemsRead}개 항목</dd></div><div><dt>분석 시점</dt><dd>{run.coverage ? date(run.coverage.observedAt) : date(run.createdAt)} KST</dd></div><div><dt>분석 범위</dt><dd>{run.coverage?.truncated ? '길이 제한과 조회 가능 범위에 따른 일부 항목' : '확인 가능한 대화 항목'}</dd></div><div><dt>판단 기준</dt><dd>{run.analysis.rubricVersion === 'workflow-evidence-v1' ? '작업 흐름 근거 v1 · 주요 판단 최대 5개, 대표 근거 각 최대 3개' : '이전 형식 · 기준 버전 미기록'}</dd></div></dl><p>사용자 환경의 Codex가 작성한 분석입니다. 전체 사용 이력에 대한 판정이나 숙련도 점수가 아닙니다. 근거의 유형은 로컬 항목과 대조하지만 요약과 원인 추정의 정확성을 독립적으로 검증한 결과는 아니며, 스킬의 실행 호환성과 기대 효과도 별도로 확인해야 합니다.</p><ul>{[...new Set([...(run.coverage?.warnings ?? []), ...run.analysis.limitations, ...(run.report?.limitations ?? [])])].map((s, i) => <li key={i}>{s}</li>)}</ul><button type="button" className="text-button" onClick={() => downloadText(`repofit-usage-${run.id}.json`, JSON.stringify(run, null, 2), 'application/json')}>분석 데이터 JSON 내려받기 <Download size={14}/></button></div></details>}
+      {run.analysis && <details className="usage-report-method"><summary><span><ShieldCheck size={17}/> 분석 근거와 확인 범위</span><ChevronDown size={16}/></summary><div><dl><div><dt>확인한 자료</dt><dd>{run.coverage?.threadsRead}개 대화, {run.coverage?.itemsRead}개 항목</dd></div><div><dt>분석 시점</dt><dd>{run.coverage ? date(run.coverage.observedAt) : date(run.createdAt)} KST</dd></div><div><dt>분석 범위</dt><dd>{run.coverage?.truncated ? '길이 제한과 조회 가능 범위에 따른 일부 항목' : '확인 가능한 대화 항목'}</dd></div><div><dt>판단 기준</dt><dd>{run.analysis.rubricVersion === 'workflow-evidence-v1' ? '작업 흐름 근거 v1 · 주요 판단 최대 5개, 대표 근거 각 최대 3개' : '이전 형식 · 기준 버전 미기록'}</dd></div></dl><p>사용자 에이전트가 작성한 분석입니다. 전체 사용 이력에 대한 판정이나 숙련도 점수가 아닙니다. {verificationNote(run)} 스킬의 실행 호환성과 기대 효과도 별도로 확인해야 합니다.</p><ul>{[...new Set([...(run.coverage?.warnings ?? []), ...run.analysis.limitations, ...(run.report?.limitations ?? [])])].map((s, i) => <li key={i}>{s}</li>)}</ul><button type="button" className="text-button" onClick={() => downloadText(`repofit-usage-${run.id}.json`, JSON.stringify(run, null, 2), 'application/json')}>분석 데이터 JSON 내려받기 <Download size={14}/></button></div></details>}
     </div>
     <footer className="usage-report-footer"><span><ShieldCheck size={14}/> 본인 계정의 분석 기록 · 30일 보관</span><span>RepoFit</span></footer>
   </article>;

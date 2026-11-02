@@ -27,7 +27,15 @@ try {
   compile('app/api/usage-analysis/route.ts', 'routes/owner.js', routeImports);
   compile('app/api/local-agent/usage-mcp/route.ts', 'routes/device.js', routeImports);
   database = new DatabaseSync(':memory:');
-  for (const file of readdirSync('drizzle').filter(f => f.endsWith('.sql')).sort()) database.exec(readFileSync(join('drizzle', file), 'utf8'));
+  for (const file of readdirSync('drizzle').filter(f => f.endsWith('.sql')).sort()) {
+    if (file.startsWith('0008_')) database.exec(`INSERT INTO agent_usage_runs (id,user_id,device_id,goal,selected_skill_ids,status,created_at,updated_at,expires_at,message,candidates,report) VALUES ('migration-fixture','fixture-owner','fixture-device','','[]','completed','2026-01-01','2026-01-01','2099-01-01','saved report','[]','{"summary":"preserved"}')`);
+    database.exec(readFileSync(join('drizzle', file), 'utf8'));
+    if (file.startsWith('0008_')) {
+      const migrated = database.prepare("SELECT executor, report FROM agent_usage_runs WHERE id='migration-fixture'").get();
+      assert.equal(migrated.executor, 'local'); assert.equal(JSON.parse(migrated.report).summary, 'preserved', 'Migration preserves existing reports');
+      database.exec("DELETE FROM agent_usage_runs WHERE id='migration-fixture'");
+    }
+  }
   const d1 = { prepare(sql) { const statement = database.prepare(sql); return { bind(...params) { return {
     async raw() { statement.setReturnArrays(true); return statement.all(...params); },
     async all() { return { results: statement.all(...params) }; },
@@ -77,6 +85,32 @@ try {
   assert.deepEqual(prepared.candidates.map(c => c.id), ['acme/skills/testing'], 'Selected candidates are not replaced by search results');
   await assert.rejects(() => store.updateUsageRun(a.token, { action: 'prepare', id: job.id, lease: job.lease, analysis, coverage }), /이미 분석/);
   const report = { summary: '검증 기준이 필요한 작업에서 이 스킬을 비교해 볼 수 있습니다.', habits: [], recommendations: [{ catalogSkillId: 'acme/skills/testing', reason: '확인한 검증 요청과 후보의 검증 절차가 관련 있습니다.', patternIds: ['pattern-1'], overlap: '기존 목록에서 같은 스킬은 확인하지 못했습니다.', prerequisites: [sentence], steps: [sentence], examplePrompt: '이 작업의 완료 조건에 맞는 검증 항목을 정리해 줘.', expectedBenefits: [sentence], checks: [sentence] }], unmetNeeds: [], limitations: ['실제 실행 호환성은 확인하지 않았습니다.'] };
+  // A direct agent needs no device, goal, questionnaire, or selected skills.
+  await assert.rejects(() => mcp.callUsageTool('start_usage_analysis', { consent: true }, {}), /로그인/);
+  await assert.rejects(() => store.createAgentUsageRun('direct-user', { consent: false }));
+  await assert.rejects(() => store.createAgentUsageRun('direct-user', { consent: true, goal: 'condition' }));
+  const direct = await store.createAgentUsageRun('direct-user', { consent: true });
+  assert.equal(direct.deviceId, null); assert.equal(direct.executor, 'agent'); assert.deepEqual(direct.selectedSkillIds, []);
+  assert.equal((await store.createAgentUsageRun('direct-user', { consent: true })).id, direct.id, 'Preparing an active request is idempotent');
+  await assert.rejects(() => store.startAgentUsageRun('other-user', { id: direct.id, consent: true }), /찾지/);
+  const directClaims = await Promise.allSettled([store.startAgentUsageRun('direct-user', { id: direct.id, consent: true }), store.startAgentUsageRun('direct-user', { id: direct.id, consent: true })]);
+  assert.equal(directClaims.filter(c => c.status === 'fulfilled').length, 1);
+  const started = directClaims.find(c => c.status === 'fulfilled').value;
+  await assert.rejects(() => store.updateAgentUsageRun('direct-user', { id: direct.id, expectedRevision: started.revision, action: 'complete', report }), /먼저/);
+  await assert.rejects(() => store.updateAgentUsageRun('other-user', { id: direct.id, expectedRevision: started.revision, action: 'prepare', analysis, coverage }), /찾지/);
+  const directPrepared = await store.updateAgentUsageRun('direct-user', { id: direct.id, expectedRevision: started.revision, action: 'prepare', analysis, coverage: { ...coverage, verification: 'local_checked' } });
+  assert.equal(directPrepared.coverage.verification, 'agent_reported', 'Direct-agent evidence is not claimed as locally verified');
+  assert.ok(directPrepared.candidates.some(c => c.id === 'acme/skills/testing'));
+  await assert.rejects(() => store.updateAgentUsageRun('direct-user', { id: direct.id, expectedRevision: started.revision, action: 'complete', report }), /상태/);
+  const directDone = await mcp.callUsageTool('submit_usage_analysis', { id: direct.id, expectedRevision: directPrepared.revision, action: 'complete', report }, { userId: 'direct-user' });
+  assert.equal(directDone.status, 'completed');
+  await assert.rejects(() => store.updateAgentUsageRun('direct-user', { id: direct.id, expectedRevision: directDone.revision, action: 'complete', report }), /상태/);
+  const directNoHistory = await mcp.callUsageTool('start_usage_analysis', { consent: true }, { userId: 'empty-agent' });
+  assert.ok(directNoHistory.instructions.includes('조건 입력 없이'));
+  assert.equal((await mcp.callUsageTool('submit_usage_analysis', { id: directNoHistory.run.id, expectedRevision: directNoHistory.run.revision, action: 'fail', reason: 'no_history' }, { userId: 'empty-agent' })).status, 'failed');
+  const directCanceled = await store.startAgentUsageRun('cancel-agent', { consent: true });
+  await store.cancelUsageRun('cancel-agent', directCanceled.id);
+  await assert.rejects(() => store.updateAgentUsageRun('cancel-agent', { id: directCanceled.id, expectedRevision: directCanceled.revision, action: 'prepare', analysis, coverage }), /상태/);
   for (const status of ['insufficient_evidence', 'not_applicable']) {
     assert.throws(() => types.validateUsageReport(report, { ...analysis, patterns: [{ ...analysis.patterns[0], assessment: { ...assessment, status } }] }, prepared.candidates), /판단 자료/);
   }
@@ -96,6 +130,13 @@ try {
   globalThis.__usageUser = { userId: 'user-a', email: 'ordinary@example.test' };
   assert.equal((await owner.POST(request('POST', body, 'https://evil.test'))).status, 403);
   assert.equal((await owner.GET(request('GET'))).headers.get('cache-control'), 'private, no-store');
+  globalThis.__usageUser = { userId: 'website-agent-user' };
+  const fromWebsiteResponse = await owner.POST(request('POST', { consent: true }));
+  assert.equal(fromWebsiteResponse.status, 201);
+  const fromWebsite = await fromWebsiteResponse.json(); assert.equal(fromWebsite.executor, 'agent'); assert.equal(fromWebsite.status, 'queued');
+  const websiteStarted = await mcp.callUsageTool('start_usage_analysis', { id: fromWebsite.id, consent: true }, { userId: 'website-agent-user' });
+  assert.equal(websiteStarted.run.status, 'running', 'Only an agent tool invocation starts analysis');
+  globalThis.__usageUser = { userId: 'user-a', email: 'ordinary@example.test' };
   const callDevice = (token, name, args = {}) => deviceRoute.POST(new Request('https://repofit.example/api/local-agent/usage-mcp', { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) }));
   assert.equal((await callDevice('invalid', 'claim_usage_analysis')).status, 401);
   assert.equal((await callDevice(a.token, 'get_usage_analysis', { id: run.id })).status, 403, 'Device bridge cannot access arbitrary user tools');
@@ -184,8 +225,15 @@ try {
   const oldHtml = renderToStaticMarkup(React.createElement(ui.UsageReport, { run: { ...reportRun, analysis: legacy }, busy: false, onCancel() {}, onNew() {} }));
   assert.ok(oldHtml.includes('이전 형식의 보고서'));
   assert.ok(!oldHtml.includes('개선 가능성'), 'Legacy reports are not assigned an invented assessment');
+  compile('lib/chatgpt-auth-paths.ts', 'lib/chatgpt-auth-paths.js');
+  compile('components/usage-analysis.tsx', 'components/usage-analysis.js', s => s.replaceAll('@/lib/', '../lib/'));
+  const analysisUi = require(join(dir, 'components/usage-analysis.js'));
+  const entryHtml = renderToStaticMarkup(React.createElement(analysisUi.UsageAnalysis, {}));
+  assert.ok(!entryHtml.includes('<textarea') && !entryHtml.includes('usage-search') && !entryHtml.includes('Mac 연결과 내 스킬 목록'), 'Default UI has no setup questionnaire or Mac prerequisite');
+  assert.ok(entryHtml.includes('에이전트 분석 요청'));
+  assert.ok(!entryHtml.includes('ChatGPT로 로그인') && !entryHtml.includes('새 분석 요청'), 'Login stays in the global header and the duplicate sidebar action is removed');
   if (process.env.REPOFIT_USAGE_PREVIEW_FILE) writeFileSync(process.env.REPOFIT_USAGE_PREVIEW_FILE, `<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>RepoFit 보고서 · 테스트 자료</title><link rel="stylesheet" href="/report.css"><body><main style="max-width:900px;margin:24px auto;padding:16px"><p style="margin-bottom:16px">화면 확인용 가상 자료입니다. 실제 사용자 분석이 아닙니다.</p>${html}</main></body></html>`);
-  console.log(`통과: 기존 격리·동의·상태·MCP 검증, 대표 근거 ID·항목 유형 대조, 자료 부족 추천 차단, 이전 보고서 호환, 보고서·Markdown 표시, 추가 호출 없는 2단계 계약, 최대 분석 전송 ${maximumPrepareBytes}바이트`);
+  console.log(`통과: 조건·기기 없는 MCP 분석 생성→시작→분석→추천→보고서 저장, 동의·소유권·단일 시작·revision·취소·자료 없음 처리, 근거 출처 표시, 이전 보고서·마이그레이션 보존, 설정 없는 기본 UI, 기존 로컬 실행 계약, 최대 분석 전송 ${maximumPrepareBytes}바이트`);
 } finally {
   database?.close(); delete globalThis.__usageDb; delete globalThis.__usageUser; delete globalThis.__usageCatalog;
   rmSync(dir, { recursive: true, force: true });
