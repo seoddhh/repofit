@@ -1,6 +1,6 @@
 import { and, desc, eq, gt, isNull, inArray } from 'drizzle-orm';
 import { getDb } from '../db';
-import { localAgentDevices as devices, agentCoachReports } from '../db/schema';
+import { localAgentDevices as devices, agentCoachReports, agentUsageRuns } from '../db/schema';
 import { localInventorySchema, pairingClaimSchema, type LocalDevice } from './local-agent-types';
 
 export class LocalAgentError extends Error {
@@ -53,4 +53,12 @@ export async function removeLocalDevice(userId: string, id: string) {
   const rows = await getDb().delete(devices).where(and(eq(devices.id, id), eq(devices.userId, userId))).returning({ id: devices.id });
   if (!rows[0]) throw new LocalAgentError('연결된 기기를 찾지 못했습니다.', 404);
   await getDb().update(agentCoachReports).set({ status: 'canceled', leaseHash: null, leaseExpiresAt: null, message: '기기 연결을 해제했습니다.', updatedAt: new Date().toISOString() }).where(and(eq(agentCoachReports.userId, userId), eq(agentCoachReports.deviceId, id), inArray(agentCoachReports.status, ['queued', 'running'])));
+  await getDb().update(agentUsageRuns).set({ status: 'canceled', leaseHash: null, leaseExpiresAt: null, activeDeviceKey: null, message: '기기 연결을 해제했습니다.', updatedAt: new Date().toISOString() }).where(and(eq(agentUsageRuns.userId, userId), eq(agentUsageRuns.deviceId, id), inArray(agentUsageRuns.status, ['queued', 'running'])));
+}
+
+export async function authenticateLocalDevice(token: string) {
+  if (!/^[a-f0-9]{48}$/.test(token)) throw new LocalAgentError('기기 인증이 필요합니다.', 401);
+  const [device] = await getDb().select().from(devices).where(and(eq(devices.tokenHash, await hash(token)), gt(devices.expiresAt, new Date().toISOString())));
+  if (!device) throw new LocalAgentError('기기 연결이 해제됐거나 만료됐습니다.', 401);
+  return device;
 }
