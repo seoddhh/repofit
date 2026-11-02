@@ -1,4 +1,4 @@
-import { github, boundedText } from './github-server';
+import { github, boundedText, GitHubError } from './github-server';
 import type { TrendingSnapshot } from './repository-types';
 import type { BriefEvidence } from './brief-types';
 
@@ -13,6 +13,9 @@ export async function collectBriefEvidence(id: string, snapshot: TrendingSnapsho
     github(`${base}/readme`).then(r => boundedText(r, 400000)).then(text => JSON.parse(text) as { content?: string; encoding?: string; size?: number; sha?: string; html_url?: string }),
     github(`${base}/releases?per_page=3`).then(r => boundedText(r, 800000)).then(text => JSON.parse(text) as { name: string; tag_name: string; body: string; html_url: string; published_at: string; draft: boolean; prerelease: boolean }[]),
   ]);
+  for (const result of [readmeResult, releaseResult]) {
+    if (result.status === 'rejected' && result.reason instanceof GitHubError && result.reason.status === 429) throw result.reason;
+  }
   const repoUrl = `https://github.com/${metadata.full_name}`;
   const sources = [{ title: '공식 GitHub 저장소', url: repoUrl }];
   let readme: string | null = null;

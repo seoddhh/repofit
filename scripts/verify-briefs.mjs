@@ -86,12 +86,12 @@ try {
   const item = queue.queue[0];
   await assert.rejects(() => store.publishBrief({ repository: item.repository, fingerprint: item.fingerprint, content: { ...content, trendReasons: [{ ...content.trendReasons[0], sourceUrls: ['https://evil.example/fake'] }] } }));
   const publishedBefore = (await store.readBrief('owner/repo0')).article.generatedAt;
-  const replacement = { ...evidence, fetchedAt: new Date().toISOString(), description: '다음 해설을 위한 새 자료' };
-  await globalThis.__briefDb.insert(editorialSources).values({ id: 'owner/repo0', fingerprint: 'b'.repeat(64), evidence: replacement, fetchedAt: replacement.fetchedAt }).onConflictDoUpdate({ target: editorialSources.id, set: { evidence: replacement, fingerprint: 'b'.repeat(64) } });
+  const replacement = { ...evidence, fetchedAt: new Date(originalNow() + 1000).toISOString(), description: '다음 해설을 위한 새 자료' };
+  await globalThis.__briefDb.insert(editorialSources).values({ id: 'owner/repo0', fingerprint: 'b'.repeat(64), evidence: replacement, fetchedAt: replacement.fetchedAt }).onConflictDoUpdate({ target: editorialSources.id, set: { evidence: replacement, fingerprint: 'b'.repeat(64), fetchedAt: replacement.fetchedAt } });
   assert.equal((await store.readBrief('owner/repo0')).article.evidence.description, '실제 설명');
   assert.equal((await store.readBrief('owner/repo0')).article.generatedAt, publishedBefore);
   Date.now = () => originalNow() + 37 * 3600000;
-  assert.equal((await store.readBrief('owner/repo0')).stale, true);
+  assert.equal((await store.readBrief('owner/repo0')).stale, true, 'A known source change is marked, rather than the age of the guide');
   await assert.rejects(() => store.publishBrief({ repository: item.repository, fingerprint: item.fingerprint, content }));
   Date.now = originalNow;
   // A changing trending list must include every rank, not a fixed top ten.
@@ -123,7 +123,10 @@ try {
   sqlite.prepare('UPDATE repository_briefs SET generated_at = ?').run('2026-10-01T00:00:00.000Z');
   sqlite.prepare('UPDATE repository_briefs SET evidence = ? WHERE id = ?').run(JSON.stringify(evidence), 'owner/repo0');
   sqlite.prepare('DELETE FROM editorial_sources').run();
+  const beforeExistingQueue = requests;
   let unchanged = await store.collectEditorialQueue({ refreshAfter });
+  assert.equal(requests, beforeExistingQueue, 'Existing guides never spend the REST budget, even without cached sources');
+  assert.equal(unchanged.changeDetection, 'missing-only-v1');
   assert.equal(unchanged.dueRepositories, 0);
   assert.equal(unchanged.unchangedRepositories, 15);
   assert.deepEqual(unchanged.periods.map(period => period.totalRepositories), [13, 4, 3]);
@@ -134,21 +137,27 @@ try {
   assert.equal(requests, beforeRepeat, 'Repeated batches reuse cached checks');
   assert.equal((await store.readBrief('owner/repo0')).article.generatedAt, '2026-10-01T00:00:00.000Z');
 
-  // Even a repeated publish request cannot overwrite an unchanged brief or its timestamp.
-  const duplicateSource = await globalThis.__briefDb.select().from(editorialSources).where(require('drizzle-orm').eq(editorialSources.id, 'owner/repo0')).get();
-  const duplicateResult = await store.publishBrief({ repository: 'OWNER/REPO0', fingerprint: duplicateSource.fingerprint, content: { ...content, summary: '내용이 같은 근거로 다시 작성한 해설을 덮어쓰면 안 됩니다.' } });
+  // Source drift is review material, not an automatic rewrite trigger.
+  const changed = { ...(await store.readBrief('owner/repo12')).article.evidence, description: '실질적인 기능 설명 변경', fetchedAt: new Date(originalNow() + 1000).toISOString() };
+  await globalThis.__briefDb.insert(editorialSources).values({ id: 'owner/repo12', evidence: changed, fingerprint: await evidenceFingerprint(changed), fetchedAt: changed.fetchedAt });
+  const beforeDriftQueue = requests;
+  const pending = await store.collectEditorialQueue({ refreshAfter });
+  assert.equal(pending.dueRepositories, 0);
+  assert.deepEqual(pending.queue, []);
+  assert.equal(requests, beforeDriftQueue);
+  assert.equal((await store.readBrief('owner/repo12')).article.content.summary, content.summary);
+  assert.equal((await store.readBrief('owner/repo12')).stale, true);
+
+  // Even a repeated publish request cannot overwrite an unchanged guide or its timestamp.
+  const duplicateSource = await store.collectEditorialQueue();
+  assert.equal(duplicateSource.dueRepositories, 0);
+  const duplicateEvidence = { ...evidence, fetchedAt: new Date().toISOString() };
+  const duplicateFingerprint = await evidenceFingerprint(duplicateEvidence);
+  await globalThis.__briefDb.insert(editorialSources).values({ id: 'owner/repo0', evidence: duplicateEvidence, fingerprint: duplicateFingerprint, fetchedAt: duplicateEvidence.fetchedAt });
+  const duplicateResult = await store.publishBrief({ repository: 'OWNER/REPO0', fingerprint: duplicateFingerprint, content: { ...content, summary: '내용이 같은 근거로 다시 작성한 해설을 덮어쓰면 안 됩니다.' } });
   assert.equal(duplicateResult.unchanged, true);
   assert.equal(duplicateResult.generatedAt, '2026-10-01T00:00:00.000Z');
   assert.equal((await store.readBrief('owner/repo0')).article.content.summary, content.summary);
-
-  // A real source change queues only that repository; publishing ends the loop.
-  const changed = { ...(await store.readBrief('owner/repo12')).article.evidence, description: '실질적인 기능 설명 변경', fetchedAt: new Date().toISOString() };
-  await globalThis.__briefDb.insert(editorialSources).values({ id: 'owner/repo12', evidence: changed, fingerprint: await evidenceFingerprint(changed), fetchedAt: changed.fetchedAt }).onConflictDoUpdate({ target: editorialSources.id, set: { evidence: changed, fingerprint: await evidenceFingerprint(changed), fetchedAt: changed.fetchedAt } });
-  const pending = await store.collectEditorialQueue({ refreshAfter });
-  assert.equal(pending.dueRepositories, 1);
-  assert.deepEqual(pending.queue.map(entry => entry.repository), ['owner/repo12']);
-  await store.publishBrief({ repository: pending.queue[0].repository, fingerprint: pending.queue[0].fingerprint, content: { ...content, trendReasons: [{ ...content.trendReasons[0], sourceUrls: [changed.sources[1].url] }] } });
-  assert.equal((await store.collectEditorialQueue({ refreshAfter })).dueRepositories, 0);
 
   const oldSource = { ...evidence, id: 'owner/source-only', fetchedAt: '2020-01-01T00:00:00.000Z' };
   await globalThis.__briefDb.insert(editorialSources).values({ id: oldSource.id, evidence: oldSource, fingerprint: await evidenceFingerprint(oldSource), fetchedAt: oldSource.fetchedAt });
@@ -159,13 +168,13 @@ try {
   assert.equal(fallback.stale, true);
   assert.ok((await store.readBrief('owner/repo0')).article);
   globalThis.fetch = fetchBeforeOfflineRead;
-  // Newly failed source collection must not replace a previously complete article.
+  // An incomplete stored check also cannot cause automatic collection or replacement.
   const incomplete = { ...changed, warnings: ['README를 읽지 못했습니다.'], readme: null };
   await globalThis.__briefDb.update(editorialSources).set({ evidence: incomplete }).where(require('drizzle-orm').eq(editorialSources.id, 'owner/repo12'));
   const failed = await store.collectEditorialQueue();
   assert.equal(failed.queue.length, 0);
-  assert.equal(failed.dueRepositories, 1);
-  assert.equal(failed.failures.length, 1);
+  assert.equal(failed.dueRepositories, 0);
+  assert.equal(failed.failures.length, 0);
   await globalThis.__briefDb.update(editorialSources).set({ evidence: changed }).where(require('drizzle-orm').eq(editorialSources.id, 'owner/repo12'));
   await assert.rejects(() => store.collectEditorialQueue({ refreshAfter: 'invalid' }));
   await assert.rejects(() => store.collectEditorialQueue({ refreshAfter: new Date(originalNow() + 3600000).toISOString() }));
@@ -180,6 +189,7 @@ try {
     globalThis.__briefUser = identity;
     const before = requests;
     assert.equal((await call('get_editorial_queue')).result.isError, true);
+    assert.equal((await call('import_repository_brief')).result.isError, true);
     assert.equal(requests, before);
   }
   globalThis.__briefUser = { email: 'owner@example.test' };
@@ -198,13 +208,66 @@ try {
   assert.equal((await browserPost(new Request('https://repofit.test/api/editorial', { method: 'POST', headers: { Origin: 'https://evil.example' }, body: '{}' }))).status, 403);
   const browserWrite = await browserPost(new Request('https://repofit.test/api/editorial', { method: 'POST', headers: { Origin: 'https://repofit.test' }, body: JSON.stringify({ method: 'tools/call', params: { name: 'get_editorial_queue' } }) }));
   assert.equal((await browserWrite.json()).result.isError, true);
+  // Direct, owner-only import: official-source validation, no REST, atomic insert and safe retry.
+  const importedInput = {
+    repository: 'owner/manual',
+    source: { description: '直接収集した紹介', language: null, stars: 0, license: null,
+      readme: 'Official README describing the input, processing, output and documented starting path.',
+      readmeUrl: 'https://raw.githubusercontent.com/owner/manual/main/README.md',
+      fetchedAt: new Date().toISOString(), period: 'monthly', warnings: ['설치와 실행은 검증하지 않았습니다.'] },
+    content: { ...content, trendReasons: [{ kind: 'fact', text: '공식 README의 용도와 시작 경로를 직접 확인했습니다.', sourceUrls: ['https://raw.githubusercontent.com/owner/manual/main/README.md'] }] },
+  };
+  for (const readmeUrl of ['https://evil.example/owner/manual/README.md', 'https://raw.githubusercontent.com/other/manual/main/README.md', 'https://github.com/owner/manual-other/blob/main/README.md', 'https://github.com@evil.example/owner/manual/blob/main/README.md']) {
+    await assert.rejects(() => store.importBrief({ ...importedInput, source: { ...importedInput.source, readmeUrl } }));
+  }
+  await assert.rejects(() => store.importBrief({ ...importedInput, source: { ...importedInput.source, fetchedAt: '2020-01-01T00:00:00Z' } }));
+  await assert.rejects(() => store.importBrief({ ...importedInput, source: { ...importedInput.source, fetchedAt: new Date(originalNow() + 3600000).toISOString() } }));
+  await assert.rejects(() => store.importBrief({ ...importedInput, content }));
+  const beforeImport = requests;
+  globalThis.__briefUser = { email: 'owner@example.test' };
+  const imported = JSON.parse((await call('import_repository_brief', importedInput)).result.content[0].text);
+  assert.equal(imported.repository, 'owner/manual');
+  assert.equal(imported.unchanged, false);
+  assert.equal(requests, beforeImport, 'Direct imports reuse Trending HTML and never call the GitHub REST API');
+  assert.equal((await store.readBrief('owner/manual')).article.content.summary, content.summary);
+  assert.equal((await store.readBrief('owner/manual')).evidence.sources[1].url, importedInput.source.readmeUrl);
+  const retried = await store.importBrief({ ...importedInput, content: { ...importedInput.content, summary: '기존 글이 있으면 직접 등록으로도 바꾸지 않습니다.' } });
+  assert.equal(retried.unchanged, true);
+  assert.equal(retried.generatedAt, imported.generatedAt);
+  assert.equal((await store.readBrief('owner/manual')).article.content.summary, content.summary);
+  Date.now = () => originalNow() + 37 * 3600000;
+  assert.equal((await store.readBrief('owner/manual')).stale, false, 'Age alone does not expire an introductory guide');
+  Date.now = originalNow;
+
+  // Failures count toward the three-attempt limit; quota failures stop immediately.
+  for (let i = 15; i < 19; i++) periodLists.daily.push({ ...trending[0], id: `owner/repo${i}` });
+  Date.now = () => originalNow() + 400000;
+  let apiCalls = 0;
+  globalThis.fetch = async url => {
+    if (url.includes('api.github.com')) { apiCalls++; return new Response('rate limit', { status: 429 }); }
+    return mockedFetch(url);
+  };
+  const limited = await store.collectEditorialQueue();
+  assert.equal(limited.dueRepositories, 4);
+  assert.equal(limited.failures.length, 1);
+  assert.equal(apiCalls, 1, 'The first quota failure halts the batch');
+  apiCalls = 0;
+  globalThis.fetch = async url => {
+    if (url.includes('api.github.com')) { apiCalls++; return new Response('failure', { status: 500 }); }
+    return mockedFetch(url);
+  };
+  assert.equal((await store.collectEditorialQueue()).failures.length, 3);
+  assert.equal(apiCalls, 3, 'Failures cannot fan out over the whole list');
+  globalThis.fetch = async url => url.includes('/readme') ? new Response('rate limit', { status: 429 }) : mockedFetch(url);
+  await assert.rejects(() => collectBriefEvidence('owner/repo15', snapshot), error => error.status === 429);
+  Date.now = originalNow;
   // Partial or stale period collection must not create a publication queue.
   Date.now = () => originalNow() + 400000;
   globalThis.fetch = async () => { throw new Error('GitHub unavailable'); };
   await assert.rejects(() => store.collectEditorialQueue(), /최신 트렌딩/);
-  assert.equal((await store.listBriefs()).length, 15, 'A collection failure preserves all published articles');
+  assert.equal((await store.listBriefs()).length, 16, 'A collection failure preserves all published articles');
   sqlite.close();
-  console.log('Brief checks passed: three-period union, case-insensitive deduplication, stable content fingerprints across periods, idempotent publication, stale fallback, real SQLite persistence, and owner-only MCP writes.');
+  console.log('Brief checks passed: missing-only three-period union, zero REST calls for saved guides, bounded failures, immediate quota stop, owner-only direct imports, official-source validation, retry preservation, source drift and SQLite persistence.');
 } finally {
   globalThis.fetch = originalFetch; Date.now = originalNow;
   delete globalThis.__briefDb; delete globalThis.__briefUser;

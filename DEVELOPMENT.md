@@ -98,4 +98,4 @@ Sites Dispatch가 `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`�
 
 서버 캐시는 인스턴스 메모리에 있으므로 서버 재시작이나 다른 Worker 인스턴스 사이에서는 공유되지 않습니다. 여러 사용자 전체의 GitHub 수집을 5분에 한 번으로 제한하는 영속 캐시는 아닙니다. `node scripts/verify-ui-behavior.mjs`에서 요청 공유, 만료, 수동 새로고침과 HTTP 잔여 시간을 확인합니다.
 
-해설 큐는 세 기간의 저장소 합집합을 대소문자 구분 없이 한 번씩 검사합니다. 내용 지문에서 모든 GitHub Trending 출처와 기간·순위·스타·시간을 제외하고 README·릴리스 등의 실질적 변경만 감지합니다. 게시 API도 같은 근거의 재요청을 생략합니다. `node scripts/verify-briefs.mjs`는 기간 중복·주간/월간 전용 저장소·기간 이동 지문·중복 게시 시 본문과 생성 시각 보존을 실제 SQLite로 검사합니다. 기존 근거의 optional `trendingPeriod` 누락은 daily로 해석하며 DB 마이그레이션은 없습니다.
+해설 큐의 로컬 준비본은 세 기간 합집합에서 해설이 있는 저장소를 외부 요청 전에 제외합니다. 한 번에 최대 3개를 시도하고 한도 오류에는 중단합니다. 소유자 전용 `import_repository_brief`로 직접 읽은 공식 자료와 새 해설을 등록할 수 있습니다. `node scripts/verify-briefs.mjs`는 기존 글에 대한 REST 호출 0회, 실패 횟수 제한, 한도 중단, 소유자 인증, 출처 검증과 중복 등록 보존을 실제 SQLite로 검사합니다. [정책과 운영 반영 전 상태](docs/EDITORIAL_REFRESH_POLICY.md)를 참고하세요. DB 마이그레이션은 없습니다.

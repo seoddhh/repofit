@@ -1,9 +1,9 @@
 import { eq, desc, inArray } from 'drizzle-orm';
 import { getDb } from '../db';
 import { editorialSources, repositoryBriefs } from '../db/schema';
-import { getTrending } from './github-server';
+import { getTrending, GitHubError } from './github-server';
 import { collectBriefEvidence, evidenceFingerprint, evidenceContentFingerprint } from './brief-evidence';
-import { editorialQueueSchema, publishBriefSchema, type BriefResponse } from './brief-types';
+import { editorialQueueSchema, importBriefSchema, publishBriefSchema, type BriefEvidence, type BriefResponse } from './brief-types';
 
 export async function listBriefs() {
   const rows = await getDb().select().from(repositoryBriefs).orderBy(desc(repositoryBriefs.generatedAt)).limit(30);
@@ -14,11 +14,9 @@ export async function readBrief(id: string): Promise<BriefResponse> {
   const db = getDb();
   const article = await db.select().from(repositoryBriefs).where(eq(repositoryBriefs.id, id.toLowerCase())).get();
   if (article) {
-    let stale = Date.now() - Date.parse(article.generatedAt) > 36 * 3600000;
-    if (stale) {
-      const checked = await db.select().from(editorialSources).where(eq(editorialSources.id, id.toLowerCase())).get();
-      if (checked && Date.now() - Date.parse(checked.fetchedAt) <= 36 * 3600000 && await evidenceContentFingerprint(article.evidence) === await evidenceContentFingerprint(checked.evidence)) stale = false;
-    }
+    // An introductory guide does not expire overnight. Flag only a known source change.
+    const checked = await db.select().from(editorialSources).where(eq(editorialSources.id, id.toLowerCase())).get();
+    const stale = Boolean(checked && Date.parse(checked.fetchedAt) > Date.parse(article.evidence.fetchedAt) && await evidenceContentFingerprint(article.evidence) !== await evidenceContentFingerprint(checked.evidence));
     return { article, evidence: article.evidence, stale };
   }
   const pending = await db.select().from(editorialSources).where(eq(editorialSources.id, id.toLowerCase())).get();
@@ -48,26 +46,55 @@ export async function collectEditorialQueue(input: unknown = {}) {
   const db = getDb();
   const published = targets.size ? await db.select({ id: repositoryBriefs.id, evidence: repositoryBriefs.evidence }).from(repositoryBriefs).where(inArray(repositoryBriefs.id, [...targets.keys()])) : [];
   const articles = new Map(published.map(article => [article.id, article]));
-  let unchangedRepositories = 0;
+  const unchangedRepositories = articles.size;
+  const missing = [...targets.values()].filter(repo => !articles.has(repo.id.toLowerCase()));
   const queue = [];
   const failures: { repository: string; error: string }[] = [];
-  for (const repo of targets.values()) {
-    if (queue.length >= 3) break;
+  // Bound attempts, including failures. Successful writes must not cause a full rescan.
+  for (const repo of missing.slice(0, 3)) {
     try {
       const cached = await db.select().from(editorialSources).where(eq(editorialSources.id, repo.id.toLowerCase())).get();
       const evidence = cached && Date.now() - Date.parse(cached.fetchedAt) < 3600000 ? cached.evidence : await collectBriefEvidence(repo.id, repo.snapshot);
-      const article = articles.get(repo.id.toLowerCase());
-      if (article && evidence.warnings.some(warning => !article.evidence.warnings.includes(warning))) throw new Error('자료 수집이 불완전합니다. 기존 해설을 유지합니다.');
       const fingerprint = await evidenceFingerprint(evidence);
       if (!cached || evidence !== cached.evidence || cached.fingerprint !== fingerprint) await db.insert(editorialSources).values({ id: repo.id.toLowerCase(), evidence, fingerprint, fetchedAt: evidence.fetchedAt }).onConflictDoUpdate({ target: editorialSources.id, set: { evidence, fingerprint, fetchedAt: evidence.fetchedAt } });
-      if (article && await evidenceContentFingerprint(article.evidence) === await evidenceContentFingerprint(evidence)) {
-        unchangedRepositories++;
-        continue;
-      }
       queue.push({ repository: evidence.id, fingerprint, evidence });
-    } catch (error) { failures.push({ repository: repo.id, error: error instanceof Error ? error.message : '자료 수집 실패' }); }
+    } catch (error) {
+      failures.push({ repository: repo.id, error: error instanceof Error ? error.message : '자료 수집 실패' });
+      if (error instanceof GitHubError && error.status === 429) break;
+    }
   }
-  return { instructions: '오늘 및 이번 주 및 이번 달 목록을 합쳐 저장소 이름의 대소문자를 구분하지 않고 중복을 제거했습니다. 기간 이동 및 순위 및 스타 수만 바뀐 레포는 검색 및 재작성하지 마세요. queue에 반환된 신규 및 자료 변경 항목만 작성하세요. 빈 큐이고 dueRepositories가 0이면 추가 조사 없이 종료하세요. refreshAfter는 호환용이며 재작성을 강제하지 않습니다. ' + editorialInstructions, queue, failures, fetchedAt: snapshots.map(snapshot => snapshot.fetchedAt).sort()[0], refreshAfter, changeDetection: 'source-content-v2', periods: snapshots.map((snapshot, index) => ({ period: periods[index], totalRepositories: snapshot.repositories.length, sourceUrl: snapshot.sourceUrl, fetchedAt: snapshot.fetchedAt })), totalRepositories: targets.size, dueRepositories: targets.size - unchangedRepositories, freshRepositories: unchangedRepositories, unchangedRepositories };
+  return { instructions: '오늘 및 이번 주 및 이번 달 목록을 합쳐 저장소 이름의 대소문자를 구분하지 않고 중복을 제거했습니다. 기존 해설은 다시 수집하거나 작성하지 마세요. 코드 및 README 및 릴리스 변경만으로 기존 소개를 자동 재작성하지 않습니다. queue에 반환된 해설이 없는 저장소만 작성하세요. 빈 큐이고 dueRepositories가 0이면 추가 조사 없이 종료하세요. failures가 있으면 반복하지 말고 실패 원인을 보고하세요. refreshAfter는 호환용이며 재작성을 강제하지 않습니다. ' + editorialInstructions, queue, failures, fetchedAt: snapshots.map(snapshot => snapshot.fetchedAt).sort()[0], refreshAfter, changeDetection: 'missing-only-v1', periods: snapshots.map((snapshot, index) => ({ period: periods[index], totalRepositories: snapshot.repositories.length, sourceUrl: snapshot.sourceUrl, fetchedAt: snapshot.fetchedAt })), totalRepositories: targets.size, dueRepositories: missing.length, freshRepositories: unchangedRepositories, unchangedRepositories };
+}
+
+export async function importBrief(input: unknown) {
+  const parsed = importBriefSchema.parse(input);
+  const id = parsed.repository.toLowerCase();
+  const db = getDb();
+  const existing = await db.select().from(repositoryBriefs).where(eq(repositoryBriefs.id, id)).get();
+  if (existing) return { repository: id, generatedAt: existing.generatedAt, url: `/explore/${id}`, unchanged: true };
+  const age = Date.now() - Date.parse(parsed.source.fetchedAt);
+  if (age < -300000 || age > 86400000) throw new Error('최근 하루 안에 직접 확인한 자료가 필요합니다.');
+  const snapshot = await getTrending(parsed.source.period);
+  if (snapshot.stale) throw new Error('최신 트렌딩을 확인하지 못했습니다.');
+  const trending = snapshot.repositories.find(repo => repo.id.toLowerCase() === id) ?? null;
+  const { description, language, stars, license, readme, readmeUrl, fetchedAt, warnings } = parsed.source;
+  const evidence: BriefEvidence = {
+    id: parsed.repository, description, language, stars: stars ?? 0, license, readme, readmeSha: null,
+    release: null, trending, trendingPeriod: parsed.source.period,
+    trendingFetchedAt: trending ? snapshot.fetchedAt : null, trendingStale: false,
+    fetchedAt, warnings, sources: [
+      { title: '공식 GitHub 저장소', url: `https://github.com/${parsed.repository}` },
+      { title: '직접 확인한 공식 README', url: readmeUrl },
+      ...(trending ? [{ title: 'GitHub Trending, 등록 시점 기준', url: snapshot.sourceUrl }] : []),
+    ],
+  };
+  const allowedUrls = new Set(evidence.sources.map(source => source.url));
+  if (parsed.content.trendReasons.some(reason => reason.sourceUrls.some(url => !allowedUrls.has(url)))) throw new Error('직접 확인한 공식 출처만 인용할 수 있습니다.');
+  const generatedAt = new Date().toISOString();
+  // Concurrent backfills and retries preserve whichever article was published first.
+  const inserted = await db.insert(repositoryBriefs).values({ id, fingerprint: await evidenceFingerprint(evidence), evidence, content: parsed.content, generatedAt }).onConflictDoNothing().returning({ id: repositoryBriefs.id });
+  const saved = await db.select().from(repositoryBriefs).where(eq(repositoryBriefs.id, id)).get();
+  return { repository: id, generatedAt: saved!.generatedAt, url: `/explore/${id}`, unchanged: inserted.length === 0 };
 }
 
 export async function publishBrief(input: unknown) {
