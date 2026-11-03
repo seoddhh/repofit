@@ -1,5 +1,5 @@
-import { claimCoachJob, updateCoachJob } from '@/lib/coach-store';
-import { localBody, localError, localJson } from '@/lib/local-agent-http';
+import { claimCoachJob, updateCoachJob } from '@/features/coach/coach-store';
+import { localBody, localError, localJson } from '@/features/local-agent/local-agent-http';
 
 export const dynamic = 'force-dynamic';
 const token = (request: Request) => request.headers.get('authorization')?.match(/^Bearer ([a-f0-9]{48})$/)?.[1] ?? '';

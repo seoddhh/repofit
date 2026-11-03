@@ -1,6 +1,6 @@
-import { readBrief, listBriefs } from '@/lib/brief-store';
-import { repositoryId } from '@/lib/repository-types';
-import { GitHubError } from '@/lib/github-server';
+import { readBrief, listBriefs } from '@/features/editorial/brief-store';
+import { repositoryId } from '@/features/repositories/repository-types';
+import { GitHubError } from '@/features/repositories/github-server';
 
 export const dynamic = 'force-dynamic';
 export async function GET(request: Request) {

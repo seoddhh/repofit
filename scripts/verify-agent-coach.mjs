@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import { DatabaseSync } from 'node:sqlite';
-import ts from 'typescript';
+import { createFixtureCompiler, writeFixture } from './test-support/compile-fixture.mjs';
 import { collectInventory } from './local-agent/inventory.mjs';
 import { runCoach } from './local-agent/coach.mjs';
 import { historySamples } from './local-agent/history.mjs';
@@ -14,16 +14,31 @@ const require = createRequire(import.meta.url);
 const originalFetch = globalThis.fetch;
 let database;
 try {
-  writeFileSync(join(dir, 'package.json'), '{"type":"commonjs"}');
+  writeFixture(dir, 'package.json', '{"type":"commonjs"}');
   symlinkSync(resolve('node_modules'), join(dir, 'node_modules'));
   for (const name of ['lib', 'db', 'routes', 'home', 'workspace']) mkdirSync(join(dir, name));
-  function compile(source, target, replace = s => s) { writeFileSync(join(dir, target), ts.transpileModule(replace(readFileSync(source, 'utf8')), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText); }
-  for (const name of ['coach-types', 'coach-rules', 'coach-server', 'coach-store', 'skill-source', 'skills-types', 'skills-server', 'github-server', 'trending-parser', 'repository-types', 'local-agent-types', 'local-agent-store', 'local-agent-http']) compile(`lib/${name}.ts`, `lib/${name}.js`);
-  compile('db/schema.ts', 'db/schema.js');
-  writeFileSync(join(dir, 'lib/catalog-store.js'), 'exports.readSkillCatalog = async () => globalThis.__coachCatalog;');
-  writeFileSync(join(dir, 'db/index.js'), 'exports.getDb = () => globalThis.__coachDb;');
-  writeFileSync(join(dir, 'auth.js'), 'exports.getChatGPTUser = async () => globalThis.__coachUser;');
-  for (const [name, source] of [['reports', 'app/api/agent-reports/route.ts'], ['jobs', 'app/api/local-agent/jobs/route.ts'], ['activities', 'app/api/agent-activity/route.ts'], ['activityUpload', 'app/api/local-agent/activity/route.ts']]) compile(source, `routes/${name}.js`, code => code.replaceAll('@/app/chatgpt-auth', '../auth').replaceAll('@/lib/', '../lib/'));
+  const compile = createFixtureCompiler(dir);
+  compile('lib/service-error.ts'); compile('lib/server-secrets.ts');
+  for (const source of [
+    'features/coach/coach-types.ts',
+    'features/coach/coach-rules.ts',
+    'features/coach/coach-server.ts',
+    'features/coach/coach-store.ts',
+    'features/skills/skill-source.ts',
+    'features/skills/skills-types.ts',
+    'features/skills/skills-server.ts',
+    'features/repositories/github-server.ts',
+    'features/repositories/trending-parser.ts',
+    'features/repositories/repository-types.ts',
+    'features/local-agent/local-agent-types.ts',
+    'features/local-agent/local-agent-store.ts',
+    'features/local-agent/local-agent-http.ts',
+  ]) compile(source);
+  compile('db/schema.ts');
+  writeFixture(dir, 'features/skills/catalog-store.js', 'exports.readSkillCatalog = async () => globalThis.__coachCatalog;');
+  writeFixture(dir, 'db/index.js', 'exports.getDb = () => globalThis.__coachDb;');
+  writeFixture(dir, 'auth.js', 'exports.getChatGPTUser = async () => globalThis.__coachUser;');
+  for (const [name, source] of [['reports', 'app/api/agent-reports/route.ts'], ['jobs', 'app/api/local-agent/jobs/route.ts'], ['activities', 'app/api/agent-activity/route.ts'], ['activityUpload', 'app/api/local-agent/activity/route.ts']]) compile(source, `routes/${name}.js`, code => code.replaceAll('@/app/chatgpt-auth', '../auth'));
   database = new DatabaseSync(':memory:');
   for (const file of readdirSync('drizzle').filter(f => f.endsWith('.sql')).sort()) database.exec(readFileSync(join('drizzle', file), 'utf8'));
   const d1 = { prepare(sql) { const statement = database.prepare(sql); return { bind(...params) { return {
@@ -32,10 +47,10 @@ try {
     async run() { statement.run(...params); return { success: true }; },
   }; } }; } };
   globalThis.__coachDb = require('drizzle-orm/d1').drizzle(d1);
-  const store = require(join(dir, 'lib/coach-store.js'));
-  const devices = require(join(dir, 'lib/local-agent-store.js'));
-  const types = require(join(dir, 'lib/coach-types.js'));
-  const { localInventorySchema } = require(join(dir, 'lib/local-agent-types.js'));
+  const store = require(join(dir, 'features/coach/coach-store.js'));
+  const devices = require(join(dir, 'features/local-agent/local-agent-store.js'));
+  const types = require(join(dir, 'features/coach/coach-types.js'));
+  const { localInventorySchema } = require(join(dir, 'features/local-agent/local-agent-types.js'));
   const api = require(join(dir, 'routes/reports.js'));
   const jobs = require(join(dir, 'routes/jobs.js'));
   const activities = require(join(dir, 'routes/activities.js'));
@@ -53,7 +68,7 @@ try {
     if (slug) return new Response(`---\nname: ${slug === 'mismatch' ? 'wrong-name' : slug}\ndescription: ${slug === 'useful-skill' ? 'Coding and testing procedures' : 'Video production and audio mixing'}\n---\n${slug === 'useful-skill' ? 'Use for coding. Verify results.' : 'Produce films and music.'}`);
     throw new Error(`Unexpected URL: ${value}`);
   };
-  const { inspectSkillSource } = require(join(dir, 'lib/skill-source.js'));
+  const { inspectSkillSource } = require(join(dir, 'features/skills/skill-source.js'));
   assert.equal((await inspectSkillSource({ id: 'acme/tools/mismatch', source: 'acme/tools', slug: 'mismatch' })).status, 'unverified');
   requests.length = 0;
   globalThis.__coachCatalog = { skills: titles.slice(0, 2).map((name, i) => ({

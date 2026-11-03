@@ -1,23 +1,26 @@
 import assert from 'node:assert/strict';
-import { readFileSync, mkdtempSync, writeFileSync, symlinkSync, rmSync } from 'node:fs';
+import { readFileSync, mkdtempSync, symlinkSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { createRequire } from 'node:module';
-import ts from 'typescript';
+import { createFixtureCompiler, writeFixture } from './test-support/compile-fixture.mjs';
 
 const temporary = mkdtempSync(join(tmpdir(), 'repofit-check-'));
 try {
-  writeFileSync(join(temporary, 'package.json'), '{"type":"commonjs"}');
+  writeFixture(temporary, 'package.json', '{"type":"commonjs"}');
   symlinkSync(resolve('node_modules'), join(temporary, 'node_modules'));
-  for (const name of ['repository-types', 'trending-parser', 'integration-plan', 'github-server']) {
-    writeFileSync(join(temporary, `${name}.js`), ts.transpileModule(readFileSync(`lib/${name}.ts`, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText);
-  }
+  const compile = createFixtureCompiler(temporary);
+  for (const source of [
+    'features/repositories/repository-types.ts',
+    'features/repositories/trending-parser.ts',
+    'features/repositories/integration-plan.ts',
+    'features/repositories/github-server.ts',
+  ]) compile(source);
   const require = createRequire(import.meta.url);
-  const { repositoryId } = require(join(temporary, 'repository-types.js'));
-  const { parseTrending } = require(join(temporary, 'trending-parser.js'));
-  const { integrationPlan } = require(join(temporary, 'integration-plan.js'));
-  const routeSource = readFileSync('app/api/repository/route.ts', 'utf8').replaceAll('@/lib/', './');
-  writeFileSync(join(temporary, 'repository-route.js'), ts.transpileModule(routeSource, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText);
+  const { repositoryId } = require(join(temporary, 'features/repositories/repository-types.js'));
+  const { parseTrending } = require(join(temporary, 'features/repositories/trending-parser.js'));
+  const { integrationPlan } = require(join(temporary, 'features/repositories/integration-plan.js'));
+  compile('app/api/repository/route.ts', 'repository-route.js');
   const { POST } = require(join(temporary, 'repository-route.js'));
   const request = (body, origin = 'https://repofit.local') => new Request('https://repofit.local/api/repository', { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body });
   assert.equal((await POST(request('{"repository":"owner/repo"}', 'https://evil.example'))).status, 403);
@@ -43,7 +46,7 @@ try {
   const candidate = { id: 'TanStack/query', description: 'Server state query library', dependencies: {}, packageName: '@tanstack/react-query' };
   const plan = integrationPlan(project, candidate);
   assert.equal(plan.existing, '^5.0.0'); assert.ok(plan.paths.every(path => project.paths.includes(path))); assert.ok(!plan.paths.includes('.env'));
-  const { github, boundedText, getTrending, inspectRepository } = require(join(temporary, 'github-server.js'));
+  const { github, boundedText, getTrending, inspectRepository } = require(join(temporary, 'features/repositories/github-server.js'));
   await assert.rejects(() => boundedText(new Response('x'.repeat(100)), 10));
   assert.equal(await boundedText(new Response('한글'), 10), '한글');
   const originalFetch = globalThis.fetch;

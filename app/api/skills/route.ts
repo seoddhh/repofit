@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { catalogSearch } from '@/lib/catalog-store';
+import { catalogSearch } from '@/features/skills/catalog-store';
 
 export const dynamic = 'force-dynamic';
 export async function GET(request: Request) {

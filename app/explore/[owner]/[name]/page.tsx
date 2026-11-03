@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
-import { RepositoryExplanation } from '@/components/repository-explanation';
-import { repositoryId } from '@/lib/repository-types';
+import { RepositoryExplanation } from '@/features/editorial/repository-explanation';
+import { repositoryId } from '@/features/repositories/repository-types';
 
 export default async function Page({ params }: { params: Promise<{ owner: string; name: string }> }) {
   const { owner, name } = await params;

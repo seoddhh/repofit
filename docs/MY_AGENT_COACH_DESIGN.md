@@ -26,13 +26,13 @@
 | `scripts/local-agent.mjs` | `--project`가 필수다. | 기본 연결을 에이전트 중심으로 만들고 프로젝트 인자를 선택 사항으로 분리한다. |
 | `scripts/local-agent/inventory.mjs` | 프로젝트 실경로를 해시하고 Codex·Claude 목록을 함께 조회한다. | 기기·에이전트 연결과 프로젝트별 목록 조회를 구분한다. |
 | `scripts/local-agent/codex.mjs` | 이미 PATH의 `codex app-server`를 실행하지만 조회 cwd가 프로젝트에 묶여 있다. | 기본 cwd를 연결 프로그램이 관리하고, 프로젝트 없는 조회·분석을 지원한다. |
-| `lib/local-agent-types.ts` | v1 스냅샷에 `project`가 필수이며 에이전트 두 개를 요구한다. | v2에서 프로젝트 없는 문맥과 선택한 에이전트를 표현한다. |
-| `db/schema.ts`, `lib/local-agent-store.ts` | 기기 행 하나에 최신 목록 하나를 저장한다. | 기기, 에이전트 프로필, 목록 스냅샷, 보고서와 작업을 분리한다. |
-| `components/local-agent-inventory.tsx` | Mac 연결에 프로젝트 절대 경로를 입력한다. | ‘Codex 연결’을 첫 동작으로 만들고 경로 입력을 없앤다. |
-| `components/agent-workspace.tsx` | 에이전트 이름·스킬을 수동 입력하고 요청을 복사한다. | 연결 프로필과 실제 목록을 사용하고 진단·보고서를 직접 요청한다. |
-| `components/agent-provider.tsx` | 요청과 결과를 현재 탭의 메모리에 보관한다. | 새로고침 후에도 복원되는 비공개 작업·보고서 저장으로 옮긴다. |
-| `lib/skills-server.ts` | skills.sh 검색 결과의 이름·출처·설치 집계·링크를 가져온다. | 후보 발견에 재사용하고, 추천 전에 실제 스킬 내용과 호환성을 확인한다. |
-| `lib/agent-review.ts` | `skillFit`에 추천·추가 능력·중복·충돌·설치 절차가 있다. | 활용 진단의 근거, 추천별 적용 가이드, 효과 확인 항목을 더한다. |
+| `features/local-agent/local-agent-types.ts` | v1 스냅샷에 `project`가 필수이며 에이전트 두 개를 요구한다. | v2에서 프로젝트 없는 문맥과 선택한 에이전트를 표현한다. |
+| `db/schema.ts`, `features/local-agent/local-agent-store.ts` | 기기 행 하나에 최신 목록 하나를 저장한다. | 기기, 에이전트 프로필, 목록 스냅샷, 보고서와 작업을 분리한다. |
+| `features/local-agent/local-agent-inventory.tsx` | Mac 연결에 프로젝트 절대 경로를 입력한다. | ‘Codex 연결’을 첫 동작으로 만들고 경로 입력을 없앤다. |
+| `features/agent-review/agent-workspace.tsx` | 에이전트 이름·스킬을 수동 입력하고 요청을 복사한다. | 연결 프로필과 실제 목록을 사용하고 진단·보고서를 직접 요청한다. |
+| `features/agent-review/agent-provider.tsx` | 요청과 결과를 현재 탭의 메모리에 보관한다. | 새로고침 후에도 복원되는 비공개 작업·보고서 저장으로 옮긴다. |
+| `features/skills/skills-server.ts` | skills.sh 검색 결과의 이름·출처·설치 집계·링크를 가져온다. | 후보 발견에 재사용하고, 추천 전에 실제 스킬 내용과 호환성을 확인한다. |
+| `features/agent-review/agent-review.ts` | `skillFit`에 추천·추가 능력·중복·충돌·설치 절차가 있다. | 활용 진단의 근거, 추천별 적용 가이드, 효과 확인 항목을 더한다. |
 
 현재 목록 연결은 사용 기록을 수집하지 않는다. 따라서 지금 있는 데이터만으로 사용자의 숙련도, 실제 스킬 사용률이나 생산성 향상을 판정할 수 없다. 기존 스킬 검토의 Markdown 출력과 보고서 UI는 재사용할 수 있지만, 프로젝트 검토 결과 타입에 모든 기능을 계속 붙이지 않는다.
 

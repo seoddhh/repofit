@@ -13,6 +13,10 @@ npm run dev
 
 기본 주소는 `http://localhost:5173`입니다. GitHub와 GitHub API에 대한 서버 측 HTTPS 연결이 필요합니다. 별도 키 없이도 공개 레포를 읽습니다. 인증 조회를 사용하려면 Git에서 제외된 루트 `.env.local`에 `GITHUB_TOKEN=발급받은_PAT`를 설정한 뒤 개발 서버를 재시작합니다. 토큰이 비어 있으면 비인증으로 요청하며, 설정한 토큰은 서버의 GitHub REST API 요청에만 사용합니다. GitHub Trending HTML 요청에는 전달하지 않습니다. 배포 환경에는 같은 이름의 런타임 비밀값을 별도로 등록해야 하며, `NEXT_PUBLIC_` 또는 `VITE_` 접두사를 붙이지 않습니다.
 
+## 코드 구조
+
+화면·타입·서버 로직은 `features/`의 저장소, 해설, 스킬, 검토 요청, 로컬 연결, 코칭, 활용 분석, 데모 기능별로 모았습니다. `app/`은 기존 페이지·API 진입점을 유지하며, 공용 UI는 `components/`, 기능 중립 도구와 커넥터는 `lib/`, D1은 `db/`에 둡니다. 이동 목록·의존성 원칙·검증 결과는 [아키텍처 리팩토링](docs/ARCHITECTURE_REFACTOR.md)을 참고하세요.
+
 ## 확인
 
 ```sh
@@ -21,6 +25,8 @@ npm run build
 node scripts/verify-repositories.mjs
 node scripts/verify-auth.mjs
 node scripts/verify-agent.mjs
+# 전체 회귀 검증 (네트워크 없이 임시 DB 사용)
+for check in scripts/verify-*.mjs; do node "$check" || exit; done
 ```
 
 저장한 실제 GitHub Trending HTML을 추가로 검증하려면 `node scripts/verify-repositories.mjs /absolute/path/trending.html`을 실행합니다. 이 스크립트의 기본 검사는 네트워크 없이 실행됩니다.
@@ -40,17 +46,17 @@ node scripts/verify-agent.mjs
 
 ## 실제 조회 경계
 
-`lib/github-server.ts`가 GitHub 자료 조회와 메모리 캐시, 응답 크기·시간 제한을 담당합니다. `lib/trending-parser.ts`는 HTML 파서로 Trending 목록을 읽습니다. `GET /api/trending`, `POST /api/repository`가 UI와 서버를 연결합니다. 레포 입력은 github.com의 owner/repository만 허용하며 임의 URL로 요청하지 않습니다.
+`features/repositories/github-server.ts`가 GitHub 자료 조회와 메모리 캐시, 응답 크기·시간 제한을 담당합니다. `features/repositories/trending-parser.ts`는 HTML 파서로 Trending 목록을 읽습니다. `GET /api/trending`, `POST /api/repository`가 UI와 서버를 연결합니다. 레포 입력은 github.com의 owner/repository만 허용하며 임의 URL로 요청하지 않습니다.
 
 README는 최대 64KB, 파일 경로는 최대 500개를 표시합니다. 루트와 얕은 경로를 먼저 보존하며 잘림·자료 조회 실패를 안내합니다. 민감한 이름의 파일 경로를 제외하고 파일 본문은 README와 루트 package.json만 읽습니다. 모노레포의 하위 패키지·다른 언어의 의존성·실제 소스 내부 동작은 분석하지 않습니다.
 
-`lib/integration-plan.ts`는 확인한 경로와 루트 의존성에 기반한 초기 검토를 만듭니다. 후보의 루트 package.json 이름은 모노레포의 배포 패키지 이름과 다를 수 있습니다. 따라서 설치 명령, 확정적인 적합도나 버전 호환성은 생성하지 않습니다. 개선 목표는 검토 맥락으로 보관하며 모델로 의미 분석하지 않습니다.
+`features/repositories/integration-plan.ts`는 확인한 경로와 루트 의존성에 기반한 초기 검토를 만듭니다. 후보의 루트 package.json 이름은 모노레포의 배포 패키지 이름과 다를 수 있습니다. 따라서 설치 명령, 확정적인 적합도나 버전 호환성은 생성하지 않습니다. 개선 목표는 검토 맥락으로 보관하며 모델로 의미 분석하지 않습니다.
 
 프로젝트와 검토 결과는 React context의 현재 탭 메모리에 보관되며 새로고침하면 사라집니다. 적용 계획은 Markdown으로 다운로드할 수 있습니다. Sites 로그인은 연결했으며 추론 권한·사용자별 D1 기록은 후속 범위입니다. `.openai/hosting.json`의 저장소 binding은 미설정입니다. 배포와 사용자 플랜의 지원 경계는 `DEPLOYMENT.md`를 참고하세요.
 
 ## 사용자 에이전트 검토
 
-`public/skills/repofit-review/SKILL.md`는 사용자가 설치할 검토 워크플로입니다. `lib/agent-review.ts`가 요청·결과 계약과 상태 전이를, `lib/agent-tools.ts`가 페이지 도구를 정의합니다. `AgentProvider`는 앱 셸에서 도구를 등록하고 계정 변경·페이지 종료 시 등록을 해제합니다. 지원하지 않는 브라우저에서도 요청 텍스트 다운로드와 결과 JSON 가져오기를 사용할 수 있습니다.
+`public/skills/repofit-review/SKILL.md`는 사용자가 설치할 검토 워크플로입니다. `features/agent-review/agent-review.ts`가 요청·결과 계약과 상태 전이를, `features/agent-review/agent-tools.ts`가 페이지 도구를 정의합니다. `AgentProvider`는 앱 셸에서 도구를 등록하고 계정 변경·페이지 종료 시 등록을 해제합니다. 지원하지 않는 브라우저에서도 요청 텍스트 다운로드와 결과 JSON 가져오기를 사용할 수 있습니다.
 
 | 페이지 도구 | 동작 |
 | --- | --- |
@@ -80,7 +86,7 @@ Sites Dispatch가 `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`�
 근거와 화면 구성 원칙은 `DESIGN.md`를 참고하세요.
 ## 오픈소스 해설 개발
 
-트렌딩 상세의 가운데 해설은 `components/repository-explanation.tsx`, 공개 조회는 `/api/brief`, 소유자 전용 수집·게시는 `/mcp`에서 제공합니다. D1의 `editorial_sources`는 다음 작성을 위한 자료, `repository_briefs`는 게시한 설명과 그 설명이 사용한 자료를 보관합니다. 루트 `.openai/hosting.json`의 DB 바인딩과 `drizzle/` 마이그레이션을 유지하세요. 방문자 프로젝트 기록과는 별개입니다.
+트렌딩 상세의 가운데 해설은 `features/editorial/repository-explanation.tsx`, 공개 조회는 `/api/brief`, 소유자 전용 수집·게시는 `/mcp`에서 제공합니다. D1의 `editorial_sources`는 다음 작성을 위한 자료, `repository_briefs`는 게시한 설명과 그 설명이 사용한 자료를 보관합니다. 루트 `.openai/hosting.json`의 DB 바인딩과 `drizzle/` 마이그레이션을 유지하세요. 방문자 프로젝트 기록과는 별개입니다.
 
 런타임 `REPOFIT_EDITOR_EMAIL`은 Sites가 인증한 소유자의 이메일과 비교하는 서버 전용 설정입니다. 미설정 상태와 다른 사용자에게는 게시를 허용하지 않습니다. 예약 실행은 [EDITORIAL.md](./EDITORIAL.md)를 따릅니다. 브라우저의 소유자 세션에서도 같은 서버 도구를 WebMCP로 사용할 수 있습니다. 이 브리지는 초기 게시와 수동 재시도용이며 무인 실행은 호스팅된 MCP 연결을 사용합니다.
 

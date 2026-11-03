@@ -1,12 +1,12 @@
+import { ServiceError } from '@/lib/service-error';
 import { env } from 'cloudflare:workers';
 import { getChatGPTUser } from '@/app/chatgpt-auth';
-import { collectEditorialQueue, importBrief, publishBrief, readBrief } from '@/lib/brief-store';
-import { publishBriefSchema } from '@/lib/brief-types';
-import { repositoryId } from '@/lib/repository-types';
-import { getSkillCatalogQueue, publishSkillExplanation, readSkillCatalog } from '@/lib/catalog-store';
-import { categoryLabels } from '@/lib/catalog-types';
-import { callUsageTool, usageTools, usageServerInstructions } from '@/lib/usage-mcp';
-import { LocalAgentError } from '@/lib/local-agent-store';
+import { collectEditorialQueue, importBrief, publishBrief, readBrief } from '@/features/editorial/brief-store';
+import { publishBriefSchema } from '@/features/editorial/brief-types';
+import { repositoryId } from '@/features/repositories/repository-types';
+import { getSkillCatalogQueue, publishSkillExplanation, readSkillCatalog } from '@/features/skills/catalog-store';
+import { categoryLabels } from '@/features/skills/catalog-types';
+import { callUsageTool, usageTools, usageServerInstructions } from '@/features/usage/usage-mcp';
 import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
@@ -81,12 +81,12 @@ export async function POST(request: Request) {
   const name = message.params?.name;
   if (usageTools.some(tool => tool.name === name)) {
     try {
-      if (['request_usage_analysis', 'start_usage_analysis', 'submit_usage_analysis'].includes(name!) && request.headers.has('origin') && request.headers.get('origin') !== new URL(request.url).origin) throw new LocalAgentError('허용되지 않은 요청입니다.', 403);
+      if (['request_usage_analysis', 'start_usage_analysis', 'submit_usage_analysis'].includes(name!) && request.headers.has('origin') && request.headers.get('origin') !== new URL(request.url).origin) throw new ServiceError('허용되지 않은 요청입니다.', 403);
       const user = await getChatGPTUser();
       const data = await callUsageTool(name!, message.params?.arguments ?? {}, { userId: user?.userId });
       return respond({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: JSON.stringify(data) }] } });
     } catch (error) {
-      return respond({ jsonrpc: '2.0', id, result: { isError: true, content: [{ type: 'text', text: error instanceof LocalAgentError ? error.message : error instanceof z.ZodError ? '분석 요청 형식을 확인해 주세요.' : '활용 분석을 처리하지 못했습니다.' }] } });
+      return respond({ jsonrpc: '2.0', id, result: { isError: true, content: [{ type: 'text', text: error instanceof ServiceError ? error.message : error instanceof z.ZodError ? '분석 요청 형식을 확인해 주세요.' : '활용 분석을 처리하지 못했습니다.' }] } });
     }
   }
   if (!tools.some(tool => tool.name === name)) return respond({ jsonrpc: '2.0', id, error: { code: -32602, message: 'Unknown tool' } });

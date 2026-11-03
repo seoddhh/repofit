@@ -1,7 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-import { skillExplanationSchema } from '../lib/catalog-types.ts';
-import { sourceAvailability } from '../lib/skills-public.mjs';
+import { skillExplanationSchema } from '../features/skills/catalog-types.ts';
+import { sourceAvailability } from '../features/skills/skills-public.mjs';
 import { uiCopy } from '../lib/ui-copy.ts';
 
 const snapshot = JSON.parse(await readFile('outputs/catalog-sources/leaderboard.json', 'utf8'));

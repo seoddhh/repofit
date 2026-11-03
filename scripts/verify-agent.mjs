@@ -1,20 +1,23 @@
 import assert from 'node:assert/strict';
-import { readFileSync, mkdtempSync, writeFileSync, symlinkSync, rmSync } from 'node:fs';
+import { mkdtempSync, symlinkSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createRequire } from 'node:module';
-import ts from 'typescript';
+import { createFixtureCompiler, writeFixture } from './test-support/compile-fixture.mjs';
 
 const temporary = mkdtempSync(join(tmpdir(), 'repofit-agent-'));
 try {
-  writeFileSync(join(temporary, 'package.json'), '{"type":"commonjs"}');
+  writeFixture(temporary, 'package.json', '{"type":"commonjs"}');
   symlinkSync(resolve('node_modules'), join(temporary, 'node_modules'));
-  for (const name of ['repository-types', 'agent-review', 'agent-tools']) {
-    writeFileSync(join(temporary, `${name}.js`), ts.transpileModule(readFileSync(`lib/${name}.ts`, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText);
-  }
+  const compile = createFixtureCompiler(temporary);
+  for (const source of [
+    'features/repositories/repository-types.ts',
+    'features/agent-review/agent-review.ts',
+    'features/agent-review/agent-tools.ts',
+  ]) compile(source);
   const require = createRequire(import.meta.url);
-  const { createAgentTask, reviseAgentTask, reviewResultSchema, resultMarkdown, taskPrompt } = require(join(temporary, 'agent-review.js'));
-  const { createAgentTools } = require(join(temporary, 'agent-tools.js'));
+  const { createAgentTask, reviseAgentTask, reviewResultSchema, resultMarkdown, taskPrompt } = require(join(temporary, 'features/agent-review/agent-review.js'));
+  const { createAgentTools } = require(join(temporary, 'features/agent-review/agent-tools.js'));
   const input = { purpose: 'project', project: { kind: 'github', repository: 'https://github.com/owner/app' }, candidate: 'owner/tool', goal: '테스트 설정 단순화' };
   const created = createAgentTask(input);
   assert.equal(created.project.repository, 'owner/app');

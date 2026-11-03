@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import { DatabaseSync } from 'node:sqlite';
-import ts from 'typescript';
+import { createFixtureCompiler, writeFixture } from './test-support/compile-fixture.mjs';
 import { runUsageJob } from './local-agent/usage.mjs';
 import { recentUsageHistory, redactUsageText } from './local-agent/history.mjs';
 
@@ -12,18 +12,25 @@ const dir = mkdtempSync(join(tmpdir(), 'repofit-usage-'));
 const require = createRequire(import.meta.url);
 let database;
 try {
-  writeFileSync(join(dir, 'package.json'), '{"type":"commonjs"}');
+  writeFixture(dir, 'package.json', '{"type":"commonjs"}');
   symlinkSync(resolve('node_modules'), join(dir, 'node_modules'));
   for (const name of ['lib', 'db', 'routes', 'public/skills/repofit-usage-analysis']) mkdirSync(join(dir, name), { recursive: true });
-  const compile = (source, target, replace = s => s) => writeFileSync(join(dir, target), ts.transpileModule(replace(readFileSync(source, 'utf8')), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText);
-  for (const name of ['usage-types', 'usage-store', 'local-agent-types', 'local-agent-store', 'local-agent-http']) compile(`lib/${name}.ts`, `lib/${name}.js`);
-  compile('db/schema.ts', 'db/schema.js');
-  writeFileSync(join(dir, 'db/index.js'), 'exports.getDb = () => globalThis.__usageDb;');
-  writeFileSync(join(dir, 'auth.js'), 'exports.getChatGPTUser = async () => globalThis.__usageUser;');
-  writeFileSync(join(dir, 'lib/catalog-store.js'), 'exports.readSkillCatalog = async () => globalThis.__usageCatalog;');
-  for (const name of ['analysis.schema.json', 'report.schema.json']) writeFileSync(join(dir, 'public/skills/repofit-usage-analysis', name), readFileSync(`public/skills/repofit-usage-analysis/${name}`));
-  compile('lib/usage-mcp.ts', 'lib/usage-mcp.js', s => s.replace(/import instructions from [^;]+;/, `const instructions = ${JSON.stringify(readFileSync('public/skills/repofit-usage-analysis/SKILL.md', 'utf8'))};`));
-  const routeImports = s => s.replaceAll('@/app/chatgpt-auth', '../auth').replaceAll('@/lib/', '../lib/');
+  const compile = createFixtureCompiler(dir);
+  compile('lib/service-error.ts'); compile('lib/server-secrets.ts');
+  for (const source of [
+    'features/usage/usage-types.ts',
+    'features/usage/usage-store.ts',
+    'features/local-agent/local-agent-types.ts',
+    'features/local-agent/local-agent-store.ts',
+    'features/local-agent/local-agent-http.ts',
+  ]) compile(source);
+  compile('db/schema.ts');
+  writeFixture(dir, 'db/index.js', 'exports.getDb = () => globalThis.__usageDb;');
+  writeFixture(dir, 'auth.js', 'exports.getChatGPTUser = async () => globalThis.__usageUser;');
+  writeFixture(dir, 'features/skills/catalog-store.js', 'exports.readSkillCatalog = async () => globalThis.__usageCatalog;');
+  for (const name of ['analysis.schema.json', 'report.schema.json']) writeFixture(dir, `public/skills/repofit-usage-analysis/${name}`, readFileSync(`public/skills/repofit-usage-analysis/${name}`));
+  compile('features/usage/usage-mcp.ts', 'features/usage/usage-mcp.js', s => s.replace(/import instructions from [^;]+;/, `const instructions = ${JSON.stringify(readFileSync('public/skills/repofit-usage-analysis/SKILL.md', 'utf8'))};`));
+  const routeImports = s => s.replaceAll('@/app/chatgpt-auth', '../auth');
   compile('app/api/usage-analysis/route.ts', 'routes/owner.js', routeImports);
   compile('app/api/local-agent/usage-mcp/route.ts', 'routes/device.js', routeImports);
   database = new DatabaseSync(':memory:');
@@ -42,12 +49,12 @@ try {
     async run() { statement.run(...params); return { success: true }; },
   }; } }; } };
   globalThis.__usageDb = require('drizzle-orm/d1').drizzle(d1);
-  const store = require(join(dir, 'lib/usage-store.js'));
-  const devices = require(join(dir, 'lib/local-agent-store.js'));
-  const mcp = require(join(dir, 'lib/usage-mcp.js'));
+  const store = require(join(dir, 'features/usage/usage-store.js'));
+  const devices = require(join(dir, 'features/local-agent/local-agent-store.js'));
+  const mcp = require(join(dir, 'features/usage/usage-mcp.js'));
   const owner = require(join(dir, 'routes/owner.js'));
   const deviceRoute = require(join(dir, 'routes/device.js'));
-  const types = require(join(dir, 'lib/usage-types.js'));
+  const types = require(join(dir, 'features/usage/usage-types.js'));
   const sentence = '공식 원문에서 확인한 코드 검증과 반복 작업에 대한 설명입니다.';
   const entry = (slug, availability = 'active') => ({ id: `acme/skills/${slug}`, name: slug, slug, source: 'acme/skills', url: `https://skills.sh/acme/skills/${slug}`, availability, checkedAt: new Date().toISOString(), contentHash: 'a'.repeat(64), installs: 10, explanation: { category: 'debugging', workKinds: ['coding', 'debugging'], tagline: sentence, summary: `testing ${slug} ${sentence}`, capabilities: ['testing'], problems: [sentence], steps: [sentence], benefits: [sentence], requirements: [sentence], limitations: [sentence] } });
   globalThis.__usageCatalog = { version: 'fixture', skills: [entry('testing'), entry('other'), entry('retired', 'deprecated')] };
@@ -143,8 +150,8 @@ try {
   assert.ok(JSON.parse((await (await callDevice(a.token, 'search_usage_skills', { query: 'testing' })).json()).result.content[0].text).skills.length);
   // The public Sites endpoint routes ordinary authenticated users before the
   // editorial owner check. Isolate unrelated editorial dependencies here.
-  for (const name of ['brief-store', 'brief-types', 'repository-types', 'catalog-types']) writeFileSync(join(dir, `lib/${name}.js`), name === 'brief-types' ? 'exports.publishBriefSchema = { shape: { content: { shape: {} } } };' : name === 'catalog-types' ? 'exports.categoryLabels = {};' : '');
-  writeFileSync(join(dir, 'env.js'), 'exports.env = { REPOFIT_EDITOR_EMAIL: "owner@example.test" };');
+  for (const [name, file] of [["brief-store", "features/editorial/brief-store.js"], ["brief-types", "features/editorial/brief-types.js"], ["repository-types", "features/repositories/repository-types.js"], ["catalog-types", "features/skills/catalog-types.js"]]) writeFixture(dir, file, name === 'brief-types' ? 'exports.publishBriefSchema = { shape: { content: { shape: {} } } };' : name === 'catalog-types' ? 'exports.categoryLabels = {};' : '');
+  writeFixture(dir, 'env.js', 'exports.env = { REPOFIT_EDITOR_EMAIL: "owner@example.test" };');
   compile('app/mcp/route.ts', 'routes/mcp.js', s => routeImports(s).replace('cloudflare:workers', '../env'));
   const publicMcp = require(join(dir, 'routes/mcp.js'));
   const callPublic = args => publicMcp.POST(new Request('https://repofit.example/mcp', { method: 'POST', body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'get_usage_analysis', arguments: args } }) })).then(r => r.json());
@@ -213,8 +220,9 @@ try {
   assert.ok(maximumPrepareBytes < 100000, 'Bounded assessment output fits the existing MCP byte cap');
   assert.ok(ajv.compile(JSON.parse(readFileSync('public/skills/repofit-usage-analysis/report.schema.json', 'utf8')))(report));
   mkdirSync(join(dir, 'components'));
-  compile('components/usage-report.tsx', 'components/usage-report.js', s => s.replace("import { downloadText } from './agent-workspace';", 'const downloadText = () => {};'));
-  const ui = require(join(dir, 'components/usage-report.js'));
+  compile('lib/download-text.ts');
+  compile('features/usage/usage-report.tsx');
+  const ui = require(join(dir, 'features/usage/usage-report.js'));
   const React = require('react'); const { renderToStaticMarkup } = require('react-dom/server');
   const reportRun = { ...run, status: 'completed', analysis, coverage, report, candidates: prepared.candidates };
   const html = renderToStaticMarkup(React.createElement(ui.UsageReport, { run: reportRun, busy: false, onCancel() {}, onNew() {} }));
@@ -225,9 +233,9 @@ try {
   const oldHtml = renderToStaticMarkup(React.createElement(ui.UsageReport, { run: { ...reportRun, analysis: legacy }, busy: false, onCancel() {}, onNew() {} }));
   assert.ok(oldHtml.includes('이전 형식의 보고서'));
   assert.ok(!oldHtml.includes('개선 가능성'), 'Legacy reports are not assigned an invented assessment');
-  compile('lib/chatgpt-auth-paths.ts', 'lib/chatgpt-auth-paths.js');
-  compile('components/usage-analysis.tsx', 'components/usage-analysis.js', s => s.replaceAll('@/lib/', '../lib/'));
-  const analysisUi = require(join(dir, 'components/usage-analysis.js'));
+  compile('lib/chatgpt-auth-paths.ts');
+  compile('features/usage/usage-analysis.tsx');
+  const analysisUi = require(join(dir, 'features/usage/usage-analysis.js'));
   const entryHtml = renderToStaticMarkup(React.createElement(analysisUi.UsageAnalysis, {}));
   assert.ok(!entryHtml.includes('<textarea') && !entryHtml.includes('usage-search') && !entryHtml.includes('Mac 연결과 내 스킬 목록'), 'Default UI has no setup questionnaire or Mac prerequisite');
   assert.ok(entryHtml.includes('에이전트 분석 요청'));

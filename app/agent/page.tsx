@@ -1,6 +1,6 @@
-import { AgentWorkspace } from '@/components/agent-workspace';
-import { AgentCoach } from '@/components/agent-coach';
-import { UsageAnalysis } from '@/components/usage-analysis';
+import { AgentWorkspace } from '@/features/agent-review/agent-workspace';
+import { AgentCoach } from '@/features/coach/agent-coach';
+import { UsageAnalysis } from '@/features/usage/usage-analysis';
 
 export default async function Page({ searchParams }: { searchParams: Promise<{ candidate?: string; task?: string; skill?: string; mode?: string; run?: string }> }) {
   const params = await searchParams;

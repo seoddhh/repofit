@@ -1,21 +1,24 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, symlinkSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, symlinkSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createRequire } from 'node:module';
-import ts from 'typescript';
+import { createFixtureCompiler, writeFixture } from './test-support/compile-fixture.mjs';
 
 const temporary = mkdtempSync(join(tmpdir(), 'repofit-skills-'));
 const originalFetch = globalThis.fetch; const originalNow = Date.now;
 try {
-  writeFileSync(join(temporary, 'package.json'), '{"type":"commonjs"}');
+  writeFixture(temporary, 'package.json', '{"type":"commonjs"}');
   symlinkSync(resolve('node_modules'), join(temporary, 'node_modules')); mkdirSync(join(temporary, 'lib'));
-  const compile = (source, output, transform = value => value) => writeFileSync(join(temporary, output), ts.transpileModule(transform(readFileSync(source, 'utf8')), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText);
-  for (const name of ['skills-types', 'skills-server']) compile(`lib/${name}.ts`, `lib/${name}.js`);
-  writeFileSync(join(temporary, 'lib/catalog-store.js'), 'exports.catalogSearch = async query => ({skills:[],checkedAt:new Date().toISOString(),sourceUrl:"https://www.skills.sh/"});');
-  compile('app/api/skills/route.ts', 'route.js', code => code.replaceAll('@/lib/', './lib/'));
+  const compile = createFixtureCompiler(temporary);
+  for (const source of [
+    'features/skills/skills-types.ts',
+    'features/skills/skills-server.ts',
+  ]) compile(source);
+  writeFixture(temporary, 'features/skills/catalog-store.js', 'exports.catalogSearch = async query => ({skills:[],checkedAt:new Date().toISOString(),sourceUrl:"https://www.skills.sh/"});');
+  compile('app/api/skills/route.ts', 'route.js');
   const require = createRequire(import.meta.url);
-  const { searchSkills } = require(join(temporary, 'lib/skills-server.js'));
+  const { searchSkills } = require(join(temporary, 'features/skills/skills-server.js'));
   const { GET } = require(join(temporary, 'route.js'));
   const skill = { id: 'vercel-labs/agent-skills/react-best-practices', name: 'react-best-practices', source: 'vercel-labs/agent-skills', installs: 1234 };
   let requests = 0;
@@ -60,7 +63,7 @@ try {
   const shell = readFileSync('components/app-shell.tsx', 'utf8');
   assert.ok(shell.includes("href: '/skills'"));
   assert.ok(shell.includes("href: '/'"));
-  assert.ok(!readFileSync('lib/github-server.ts', 'utf8').includes('skills.sh'));
+  assert.ok(!readFileSync('features/repositories/github-server.ts', 'utf8').includes('skills.sh'));
   console.log('통과: 공개 검색 API·캐시·동시 요청 공유·출처 검증·빈 결과·요청 제한·이전 자료·크기 제한·트렌딩 유지');
 } finally {
   globalThis.fetch = originalFetch; Date.now = originalNow;

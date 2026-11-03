@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, mkdtempSync, mkdirSync, symlinkSync, rmSync, copyFileSync } from 'node:fs';
+import { readFileSync, mkdtempSync, mkdirSync, symlinkSync, rmSync, copyFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { createRequire } from 'node:module';
 import { createHash } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
-import ts from 'typescript';
-import { parsePublicLeaderboard, parsePublicSkill } from '../lib/skills-public.mjs';
+import { createFixtureCompiler, writeFixture } from './test-support/compile-fixture.mjs';
+import { parsePublicLeaderboard, parsePublicSkill } from '../features/skills/skills-public.mjs';
 
 const temporary = mkdtempSync(join(tmpdir(), 'repofit-catalog-'));
 const require = createRequire(import.meta.url);
@@ -15,7 +15,7 @@ let sqlite;
 const page = props => `<span>SKILL.md</span><script>self.__next_f.push(${JSON.stringify([1, `0:${JSON.stringify(['$', '$L1', null, props])}\n`])})</script>`;
 try {
   for (const dir of ['lib', 'db', 'content']) mkdirSync(join(temporary, dir));
-  writeFileSync(join(temporary, 'package.json'), '{"type":"commonjs"}');
+  writeFixture(temporary, 'package.json', '{"type":"commonjs"}');
   symlinkSync(resolve('node_modules'), join(temporary, 'node_modules'));
   const fixture = JSON.parse(readFileSync('content/skill-catalog.json', 'utf8'));
   assert.equal(fixture.skills.length, 300, 'Exactly 300 authored skills are packaged');
@@ -23,12 +23,13 @@ try {
   const hash = value => createHash('sha256').update(value).digest('hex');
   fixture.checkedAt = new Date().toISOString();
   for (const skill of fixture.skills) skill.contentHash = hash(body(skill));
-  writeFileSync(join(temporary, 'content/skill-catalog.json'), JSON.stringify(fixture));
-  for (const file of ['lib/catalog-store.ts', 'lib/catalog-types.ts', 'lib/ui-copy.ts', 'lib/github-server.ts', 'lib/trending-parser.ts', 'lib/repository-types.ts', 'db/schema.ts']) {
-    writeFileSync(join(temporary, file.replace('.ts', '.js')), ts.transpileModule(readFileSync(file, 'utf8'), { compilerOptions: { esModuleInterop: true, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText);
+  writeFixture(temporary, 'content/skill-catalog.json', JSON.stringify(fixture));
+  const compile = createFixtureCompiler(temporary);
+  for (const file of ['features/skills/catalog-store.ts', 'features/skills/catalog-types.ts', 'lib/ui-copy.ts', 'features/repositories/github-server.ts', 'features/repositories/trending-parser.ts', 'features/repositories/repository-types.ts', 'db/schema.ts']) {
+    compile(file);
   }
-  copyFileSync('lib/skills-public.mjs', join(temporary, 'lib/skills-public.mjs'));
-  writeFileSync(join(temporary, 'db/index.js'), 'exports.getDb = () => globalThis.__catalogDb;');
+  copyFileSync('features/skills/skills-public.mjs', join(temporary, 'features/skills/skills-public.mjs'));
+  writeFixture(temporary, 'db/index.js', 'exports.getDb = () => globalThis.__catalogDb;');
   sqlite = new DatabaseSync(':memory:');
   sqlite.exec(readFileSync('drizzle/0006_exotic_supreme_intelligence.sql', 'utf8'));
   const d1 = { prepare(sql) { const statement = sqlite.prepare(sql); return { bind(...params) { return {
@@ -37,8 +38,8 @@ try {
     async run() { statement.run(...params); return { success: true }; },
   }; } }; } };
   globalThis.__catalogDb = require('drizzle-orm/d1').drizzle(d1);
-  const store = require(join(temporary, 'lib/catalog-store.js'));
-  const { skillExplanationSchema } = require(join(temporary, 'lib/catalog-types.js'));
+  const store = require(join(temporary, 'features/skills/catalog-store.js'));
+  const { skillExplanationSchema } = require(join(temporary, 'features/skills/catalog-types.js'));
   for (const skill of fixture.skills) assert.ok(skillExplanationSchema.safeParse(skill.explanation).success, skill.id);
   let requests = 0;
   globalThis.fetch = async () => { requests++; throw new Error('Offline'); };

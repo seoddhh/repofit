@@ -1,8 +1,8 @@
 import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
-import type { UsageAnalysis, UsageCoverage, UsageReport, UsageCandidate } from '../lib/usage-types';
-import type { BriefContent, BriefEvidence } from '../lib/brief-types';
-import type { LocalInventory } from '../lib/local-agent-types';
-import type { ActivitySummary, CoachBundle, CoachNarrative, CoachReport } from '../lib/coach-types';
+import type { UsageAnalysis, UsageCoverage, UsageReport, UsageCandidate } from '../features/usage/usage-types';
+import type { BriefContent, BriefEvidence } from '../features/editorial/brief-types';
+import type { LocalInventory } from '../features/local-agent/local-agent-types';
+import type { ActivitySummary, CoachBundle, CoachNarrative, CoachReport } from '../features/coach/coach-types';
 
 export const skillCatalogState = sqliteTable('skill_catalog_state', {
   id: text('id').primaryKey(), data: text('data', { mode: 'json' }).$type<unknown>().notNull(), updatedAt: text('updated_at').notNull(),

@@ -1,12 +1,13 @@
+import { ServiceError } from '@/lib/service-error';
 import { z } from 'zod';
 import { getChatGPTUser } from '@/app/chatgpt-auth';
-import { createLocalPairing, listLocalDevices, removeLocalDevice, LocalAgentError } from '@/lib/local-agent-store';
-import { localBody, localError, localJson, requireLocalOrigin } from '@/lib/local-agent-http';
+import { createLocalPairing, listLocalDevices, removeLocalDevice } from '@/features/local-agent/local-agent-store';
+import { localBody, localError, localJson, requireLocalOrigin } from '@/features/local-agent/local-agent-http';
 
 export const dynamic = 'force-dynamic';
 async function userId() {
   const user = await getChatGPTUser();
-  if (!user) throw new LocalAgentError('로그인 후 Mac을 연결해 주세요.', 401);
+  if (!user) throw new ServiceError('로그인 후 Mac을 연결해 주세요.', 401);
   return user.userId;
 }
 export async function GET() {

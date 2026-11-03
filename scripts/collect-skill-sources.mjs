@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
-import { parsePublicSkill } from '../lib/skills-public.mjs';
+import { parsePublicSkill } from '../features/skills/skills-public.mjs';
 
 const directory = 'outputs/catalog-sources';
 await mkdir(directory, { recursive: true });

@@ -1,4 +1,4 @@
-import { SkillsCatalog } from '@/components/skills-catalog';
+import { SkillsCatalog } from '@/features/skills/skills-catalog';
 
 export default async function Page({ searchParams }: { searchParams: Promise<{ q?: string; skill?: string }> }) {
   const { q, skill } = await searchParams;

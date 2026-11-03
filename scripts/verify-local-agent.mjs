@@ -3,8 +3,9 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, symlinkSync, rmSyn
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createRequire } from 'node:module';
+import { createHash } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
-import ts from 'typescript';
+import { createFixtureCompiler, writeFixture } from './test-support/compile-fixture.mjs';
 import { claudeInventory } from './local-agent/claude.mjs';
 import { codexInventory } from './local-agent/codex.mjs';
 import { readAllowed, skillFiles } from './local-agent/files.mjs';
@@ -13,17 +14,20 @@ const temporary = realpathSync(mkdtempSync(join(tmpdir(), 'repofit-local-agent-'
 const require = createRequire(import.meta.url);
 let sqlite;
 try {
-  writeFileSync(join(temporary, 'package.json'), '{"type":"commonjs"}');
+  writeFixture(temporary, 'package.json', '{"type":"commonjs"}');
   symlinkSync(resolve('node_modules'), join(temporary, 'node_modules'));
   for (const dir of ['lib', 'db', 'routes', 'home/.claude/skills/shared', 'project/.claude/skills/shared', 'project/.claude/skills/blocked', 'home/.claude/plugins/cache/test/skills/plugin-skill']) mkdirSync(join(temporary, dir), { recursive: true });
-  function compile(source, output, transform = value => value) {
-    writeFileSync(join(temporary, output), ts.transpileModule(transform(readFileSync(source, 'utf8')), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText);
-  }
-  for (const name of ['local-agent-types', 'local-agent-store', 'local-agent-http']) compile(`lib/${name}.ts`, `lib/${name}.js`);
-  compile('db/schema.ts', 'db/schema.js');
-  writeFileSync(join(temporary, 'db/index.js'), 'exports.getDb = () => globalThis.__localAgentDb;');
-  writeFileSync(join(temporary, 'auth.js'), 'exports.getChatGPTUser = async () => globalThis.__localAgentUser;');
-  for (const [name, source] of [['owner', 'app/api/local-agent/route.ts'], ['connect', 'app/api/local-agent/connect/route.ts'], ['snapshot', 'app/api/local-agent/snapshot/route.ts']]) compile(source, `routes/${name}.js`, code => code.replaceAll("@/app/chatgpt-auth", '../auth').replaceAll('@/lib/', '../lib/'));
+  const compile = createFixtureCompiler(temporary);
+  compile('lib/service-error.ts'); compile('lib/server-secrets.ts');
+  for (const source of [
+    'features/local-agent/local-agent-types.ts',
+    'features/local-agent/local-agent-store.ts',
+    'features/local-agent/local-agent-http.ts',
+  ]) compile(source);
+  compile('db/schema.ts');
+  writeFixture(temporary, 'db/index.js', 'exports.getDb = () => globalThis.__localAgentDb;');
+  writeFixture(temporary, 'auth.js', 'exports.getChatGPTUser = async () => globalThis.__localAgentUser;');
+  for (const [name, source] of [['owner', 'app/api/local-agent/route.ts'], ['connect', 'app/api/local-agent/connect/route.ts'], ['snapshot', 'app/api/local-agent/snapshot/route.ts']]) compile(source, `routes/${name}.js`, code => code.replaceAll("@/app/chatgpt-auth", '../auth'));
   sqlite = new DatabaseSync(':memory:');
   for (const file of readdirSync('drizzle').filter(file => file.endsWith('.sql')).sort()) sqlite.exec(readFileSync(join('drizzle', file), 'utf8'));
   const d1 = { prepare(sql) { const statement = sqlite.prepare(sql); return { bind(...params) { return {
@@ -32,8 +36,8 @@ try {
     async run() { statement.run(...params); return { success: true }; },
   }; } }; } };
   globalThis.__localAgentDb = require('drizzle-orm/d1').drizzle(d1);
-  const store = require(join(temporary, 'lib/local-agent-store.js'));
-  const { localInventorySchema } = require(join(temporary, 'lib/local-agent-types.js'));
+  const store = require(join(temporary, 'features/local-agent/local-agent-store.js'));
+  const { localInventorySchema } = require(join(temporary, 'features/local-agent/local-agent-types.js'));
   const owner = require(join(temporary, 'routes/owner.js'));
   const connect = require(join(temporary, 'routes/connect.js'));
   const snapshotRoute = require(join(temporary, 'routes/snapshot.js'));
@@ -51,6 +55,8 @@ try {
   const connectionResponse = await connect.POST(request('POST', { code: pairing.code, name: 'Test Mac' }));
   assert.equal(connectionResponse.status, 200);
   const connection = await connectionResponse.json();
+  assert.match(connection.token, /^[a-f0-9]{48}$/, 'Existing device token format is preserved');
+  assert.equal(sqlite.prepare('SELECT token_hash FROM local_agent_devices').get().token_hash, createHash('sha256').update(connection.token).digest('hex'), 'Stored tokens remain compatible with the existing SHA-256 format');
   assert.equal((await connect.POST(request('POST', { code: pairing.code, name: 'Reuse' }))).status, 401);
   assert.notEqual(sqlite.prepare('SELECT token_hash FROM local_agent_devices').get().token_hash, connection.token);
   const inventory = { protocolVersion: 1, observedAt: new Date().toISOString(), project: { id: 'a'.repeat(64), name: 'repo', branch: 'main' }, agents: ['codex', 'claude'].map(id => ({ id, version: 'test', status: 'ready', skills: [], warnings: [] })) };
@@ -81,7 +87,7 @@ try {
   writeFileSync(join(home, '.claude/settings.json'), JSON.stringify({ enabledPlugins: { 'test@market': true } }));
   writeFileSync(join(project, '.claude/settings.local.json'), JSON.stringify({ skillOverrides: { blocked: 'off' } }));
   writeFileSync(join(home, '.claude/plugins/installed_plugins.json'), JSON.stringify({ plugins: { 'test@market': [{ scope: 'user', installPath: join(home, '.claude/plugins/cache/test') }] } }));
-  writeFileSync(join(temporary, 'secret'), 'PRIVATE_AUTH_TOKEN');
+  writeFixture(temporary, 'secret', 'PRIVATE_AUTH_TOKEN');
   symlinkSync(join(temporary, 'secret'), join(project, '.claude/skills/blocked/secret-link'));
   await assert.rejects(() => readAllowed(join(project, '.claude/skills/blocked/secret-link'), [join(project, '.claude/skills')]), /승인 범위/);
   symlinkSync(join(temporary, 'secret'), join(home, '.claude/credentials-link.json'));

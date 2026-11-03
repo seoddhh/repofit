@@ -1,5 +1,5 @@
-import { receiveAgentActivity } from '@/lib/coach-store';
-import { localBody, localError, localJson } from '@/lib/local-agent-http';
+import { receiveAgentActivity } from '@/features/coach/coach-store';
+import { localBody, localError, localJson } from '@/features/local-agent/local-agent-http';
 
 export const dynamic = 'force-dynamic';
 export async function PUT(request: Request) {

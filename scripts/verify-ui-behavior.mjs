@@ -16,7 +16,7 @@ let clock = Date.now();
 class Clock extends Date { static now() { return clock; } }
 const snapshot = () => ({ repositories: [], fetchedAt: new Date(clock).toISOString(), sourceUrl: 'https://github.com/trending?since=daily', stale: false });
 let calls = 0; let fail = false; let stale = false; let lastOptions; let lastUrl;
-const client = load('lib/trending-client.ts', { Date: Clock, fetch: async (_url, options) => {
+const client = load('features/repositories/trending-client.ts', { Date: Clock, fetch: async (_url, options) => {
   calls++; lastOptions = options; lastUrl = _url;
   if (fail) return Response.json({ error: 'offline' }, { status: 502 });
   return Response.json({ ...snapshot(), sourceUrl: `https://github.com/trending?since=${new URL(_url, 'https://repofit.local').searchParams.get('since')}`, stale });
@@ -71,7 +71,7 @@ assert.equal(lastUrl, '/api/trending?since=weekly');
 assert.equal(lastOptions.cache, 'reload');
 let routePeriod;
 let routeSnapshot = { ...snapshot(), fetchedAt: new Date(clock - 120000).toISOString() };
-const route = load('app/api/trending/route.ts', { Date: Clock, console: { warn() {} } }, { '@/lib/github-server': { getTrending: async period => { routePeriod = period; return routeSnapshot; } } });
+const route = load('app/api/trending/route.ts', { Date: Clock, console: { warn() {} } }, { '@/features/repositories/github-server': { getTrending: async period => { routePeriod = period; return routeSnapshot; } } });
 assert.equal((await route.GET(new Request('https://repofit.local/api/trending'))).headers.get('cache-control'), 'private, max-age=180', 'Browser TTL must respect the original collection time');
 routeSnapshot = { ...routeSnapshot, stale: true };
 assert.equal((await route.GET(new Request('https://repofit.local/api/trending'))).headers.get('cache-control'), 'no-store');

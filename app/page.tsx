@@ -1,2 +1,2 @@
-import { Dashboard } from '@/components/dashboard';
+import { Dashboard } from '@/features/repositories/dashboard';
 export default function Page() { return <Dashboard />; }

@@ -2,10 +2,10 @@
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { Compass, FolderGit2, ArrowUpRight, ChevronDown, LogIn, LogOut, X, GitBranch, Bot, Puzzle } from 'lucide-react';
-import { DemoProvider, useDemo } from './demo-provider';
-import { WorkspaceProvider, useWorkspace } from './workspace-provider';
-import { AgentProvider } from './agent-provider';
-import { EditorialBridge } from './editorial-bridge';
+import { DemoProvider, useDemo } from '../features/demo/demo-provider';
+import { WorkspaceProvider, useWorkspace } from '../features/repositories/workspace-provider';
+import { AgentProvider } from '../features/agent-review/agent-provider';
+import { EditorialBridge } from '../features/editorial/editorial-bridge';
 import { GithubIcon } from './github-icon';
 import type { ChatGPTUser } from '@/app/chatgpt-auth';
 import { chatGPTSignInPath, chatGPTSignOutPath } from '@/lib/chatgpt-auth-paths';

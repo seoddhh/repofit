@@ -1,4 +1,4 @@
-import { getTrending } from '@/lib/github-server';
+import { getTrending } from '@/features/repositories/github-server';
 
 export async function GET(request: Request) {
   const period = new URL(request.url).searchParams.get('since') ?? 'daily';

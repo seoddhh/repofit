@@ -1,11 +1,11 @@
+import { ServiceError } from '@/lib/service-error';
 import { z } from 'zod';
 import { getChatGPTUser } from '@/app/chatgpt-auth';
-import { LocalAgentError } from '@/lib/local-agent-store';
-import { listAgentActivities, deleteAgentActivity } from '@/lib/coach-store';
-import { localBody, localError, localJson, requireLocalOrigin } from '@/lib/local-agent-http';
+import { listAgentActivities, deleteAgentActivity } from '@/features/coach/coach-store';
+import { localBody, localError, localJson, requireLocalOrigin } from '@/features/local-agent/local-agent-http';
 
 export const dynamic = 'force-dynamic';
-async function owner() { const user = await getChatGPTUser(); if (!user) throw new LocalAgentError('로그인이 필요합니다.', 401); return user.userId; }
+async function owner() { const user = await getChatGPTUser(); if (!user) throw new ServiceError('로그인이 필요합니다.', 401); return user.userId; }
 export async function GET() {
   try { return localJson({ activities: await listAgentActivities(await owner()) }); } catch (error) { return localError(error); }
 }

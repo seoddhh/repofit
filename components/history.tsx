@@ -2,11 +2,11 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, ArrowUpRight, Clock3, FileText, Trash2, FolderGit2 } from 'lucide-react';
-import { useWorkspace } from './workspace-provider';
-import { useDemo } from './demo-provider';
-import { useAgentWorkspace } from './agent-provider';
-import { projectLabel, taskLabel, taskPath, taskStatusLabels } from '@/lib/agent-review';
-import { isFinished, type DemoRun } from '@/lib/demo-agent';
+import { useWorkspace } from '../features/repositories/workspace-provider';
+import { useDemo } from '../features/demo/demo-provider';
+import { useAgentWorkspace } from '../features/agent-review/agent-provider';
+import { projectLabel, taskLabel, taskPath, taskStatusLabels } from '@/features/agent-review/agent-review';
+import { isFinished, type DemoRun } from '@/features/demo/demo-agent';
 const labels = { running: '진행 중', paused: '일시 중단', completed: '완료', partial: '일부 완료', canceled: '취소됨' };
 
 export function History() {

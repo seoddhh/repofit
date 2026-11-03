@@ -1,25 +1,32 @@
 import assert from 'node:assert/strict';
-import { readFileSync, mkdtempSync, writeFileSync, symlinkSync, rmSync, mkdirSync } from 'node:fs';
+import { readFileSync, mkdtempSync, symlinkSync, rmSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { createRequire } from 'node:module';
 import { DatabaseSync } from 'node:sqlite';
-import ts from 'typescript';
+import { createFixtureCompiler, writeFixture } from './test-support/compile-fixture.mjs';
 
 const temporary = mkdtempSync(join(tmpdir(), 'repofit-briefs-'));
 const require = createRequire(import.meta.url);
 const originalFetch = globalThis.fetch;
 const originalNow = Date.now;
 try {
-  writeFileSync(join(temporary, 'package.json'), '{"type":"commonjs"}');
+  writeFixture(temporary, 'package.json', '{"type":"commonjs"}');
   symlinkSync(resolve('node_modules'), join(temporary, 'node_modules'));
   mkdirSync(join(temporary, 'lib')); mkdirSync(join(temporary, 'db'));
-  const compile = (source, target, transform = s => s) => writeFileSync(join(temporary, target), ts.transpileModule(transform(readFileSync(source, 'utf8')), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText);
-  for (const name of ['repository-types', 'trending-parser', 'github-server', 'brief-types', 'brief-evidence', 'brief-store']) compile(`lib/${name}.ts`, `lib/${name}.js`);
-  compile('db/schema.ts', 'db/schema.js');
-  compile('lib/catalog-types.ts', 'lib/catalog-types.js');
-  writeFileSync(join(temporary, 'lib/catalog-store.js'), 'exports.readSkillCatalog = async () => ({skills:[]}); exports.getSkillCatalogQueue = async () => ({queue:[]});');
-  writeFileSync(join(temporary, 'db/index.js'), 'exports.getDb = () => globalThis.__briefDb;');
+  const compile = createFixtureCompiler(temporary);
+  for (const source of [
+    'features/repositories/repository-types.ts',
+    'features/repositories/trending-parser.ts',
+    'features/repositories/github-server.ts',
+    'features/editorial/brief-types.ts',
+    'features/editorial/brief-evidence.ts',
+    'features/editorial/brief-store.ts',
+  ]) compile(source);
+  compile('db/schema.ts');
+  compile('features/skills/catalog-types.ts');
+  writeFixture(temporary, 'features/skills/catalog-store.js', 'exports.readSkillCatalog = async () => ({skills:[]}); exports.getSkillCatalogQueue = async () => ({queue:[]});');
+  writeFixture(temporary, 'db/index.js', 'exports.getDb = () => globalThis.__briefDb;');
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec(readFileSync('drizzle/0000_tricky_paibok.sql', 'utf8'));
   const d1 = { prepare(sql) {
@@ -31,10 +38,10 @@ try {
     }; } };
   } };
   globalThis.__briefDb = require('drizzle-orm/d1').drizzle(d1);
-  const store = require(join(temporary, 'lib/brief-store.js'));
-  const schema = require(join(temporary, 'lib/brief-types.js'));
+  const store = require(join(temporary, 'features/editorial/brief-store.js'));
+  const schema = require(join(temporary, 'features/editorial/brief-types.js'));
   const { editorialSources } = require(join(temporary, 'db/schema.js'));
-  const { collectBriefEvidence, evidenceFingerprint, evidenceContentFingerprint } = require(join(temporary, 'lib/brief-evidence.js'));
+  const { collectBriefEvidence, evidenceFingerprint, evidenceContentFingerprint } = require(join(temporary, 'features/editorial/brief-evidence.js'));
   const trending = Array.from({ length: 13 }, (_, i) => ({ id: `owner/repo${i}`, rank: i + 1, description: 'A tool', language: 'TypeScript', color: null, stars: 100, today: 10 }));
   const snapshot = { repositories: trending, fetchedAt: new Date().toISOString(), sourceUrl: 'https://github.com/trending?since=daily', stale: false };
   const weeklyOnly = { ...trending[0], id: 'owner/repo13' };
@@ -180,12 +187,12 @@ try {
   await assert.rejects(() => store.collectEditorialQueue({ refreshAfter: new Date(originalNow() + 3600000).toISOString() }));
   await assert.rejects(() => store.collectEditorialQueue({ unknown: true }));
   // Exercise the real MCP route with authenticated identity and storage stubs.
-  writeFileSync(join(temporary, 'test-env.js'), 'exports.env = { REPOFIT_EDITOR_EMAIL: "owner@example.test" };');
-  writeFileSync(join(temporary, 'test-auth.js'), 'exports.getChatGPTUser = async () => globalThis.__briefUser;');
+  writeFixture(temporary, 'test-env.js', 'exports.env = { REPOFIT_EDITOR_EMAIL: "owner@example.test" };');
+  writeFixture(temporary, 'test-auth.js', 'exports.getChatGPTUser = async () => globalThis.__briefUser;');
   // Usage MCP has its own integration suite; this suite isolates editorial access.
-  writeFileSync(join(temporary, 'lib/usage-mcp.js'), 'exports.usageTools = []; exports.usageServerInstructions = "";');
-  writeFileSync(join(temporary, 'lib/local-agent-store.js'), 'exports.LocalAgentError = class extends Error {};');
-  compile('app/mcp/route.ts', 'mcp.js', s => s.replaceAll("'cloudflare:workers'", "'./test-env'").replaceAll("'@/app/chatgpt-auth'", "'./test-auth'").replaceAll("'@/lib/", "'./lib/"));
+  writeFixture(temporary, 'features/usage/usage-mcp.js', 'exports.usageTools = []; exports.usageServerInstructions = "";');
+  compile('lib/service-error.ts');
+  compile('app/mcp/route.ts', 'mcp.js', s => s.replaceAll("'cloudflare:workers'", "'./test-env'").replaceAll("'@/app/chatgpt-auth'", "'./test-auth'"));
   const { POST } = require(join(temporary, 'mcp.js'));
   const call = (name, args = {}) => POST(new Request('https://repofit.test/mcp', { method: 'POST', body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) })).then(r => r.json());
   for (const identity of [null, { email: 'visitor@example.test' }]) {

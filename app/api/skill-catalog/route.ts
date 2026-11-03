@@ -1,4 +1,4 @@
-import { readSkillCatalog } from '@/lib/catalog-store';
+import { readSkillCatalog } from '@/features/skills/catalog-store';
 export const dynamic = 'force-dynamic';
 export async function GET() {
   try {

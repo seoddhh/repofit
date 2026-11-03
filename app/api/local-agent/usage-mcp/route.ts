@@ -1,7 +1,8 @@
+import { ServiceError } from '@/lib/service-error';
 import { z } from 'zod';
-import { authenticateLocalDevice, LocalAgentError } from '@/lib/local-agent-store';
-import { localBody, localJson } from '@/lib/local-agent-http';
-import { callUsageTool, usageDeviceTools, usageServerInstructions, usageTools } from '@/lib/usage-mcp';
+import { authenticateLocalDevice } from '@/features/local-agent/local-agent-store';
+import { localBody, localJson } from '@/features/local-agent/local-agent-http';
+import { callUsageTool, usageDeviceTools, usageServerInstructions, usageTools } from '@/features/usage/usage-mcp';
 
 export const dynamic = 'force-dynamic';
 export async function POST(request: Request) {
@@ -15,10 +16,10 @@ export async function POST(request: Request) {
     if (m.method === 'tools/list') return respond({ tools: [...usageTools.filter(t => ['get_usage_analysis_instructions', 'search_usage_skills'].includes(t.name)), ...usageDeviceTools] });
     if (m.method !== 'tools/call') return localJson({ jsonrpc: '2.0', id: m.id ?? null, error: { code: -32601, message: 'Method not found' } });
     const { name, arguments: args } = z.object({ name: z.string(), arguments: z.unknown().default({}) }).strict().parse(m.params);
-    if (![...usageDeviceTools, ...usageTools.filter(t => ['get_usage_analysis_instructions', 'search_usage_skills'].includes(t.name))].some(t => t.name === name)) throw new LocalAgentError('연결 프로그램이 사용할 수 없는 도구입니다.', 403);
+    if (![...usageDeviceTools, ...usageTools.filter(t => ['get_usage_analysis_instructions', 'search_usage_skills'].includes(t.name))].some(t => t.name === name)) throw new ServiceError('연결 프로그램이 사용할 수 없는 도구입니다.', 403);
     try { const data = await callUsageTool(name, args, { deviceToken: token }); return respond({ content: [{ type: 'text', text: JSON.stringify(data) }] }); }
-    catch (error) { return respond({ isError: true, content: [{ type: 'text', text: error instanceof LocalAgentError ? error.message : error instanceof z.ZodError ? '분석 결과 형식을 확인해 주세요.' : '분석 도구를 처리하지 못했습니다.' }] }); }
+    catch (error) { return respond({ isError: true, content: [{ type: 'text', text: error instanceof ServiceError ? error.message : error instanceof z.ZodError ? '분석 결과 형식을 확인해 주세요.' : '분석 도구를 처리하지 못했습니다.' }] }); }
   } catch (error) {
-    return localJson({ error: error instanceof LocalAgentError ? error.message : 'MCP 요청 형식을 확인해 주세요.' }, error instanceof LocalAgentError ? error.status : 400);
+    return localJson({ error: error instanceof ServiceError ? error.message : 'MCP 요청 형식을 확인해 주세요.' }, error instanceof ServiceError ? error.status : 400);
   }
 }

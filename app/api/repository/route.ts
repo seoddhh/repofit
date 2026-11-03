@@ -1,5 +1,5 @@
-import { GitHubError, inspectRepository } from '@/lib/github-server';
-import { repositoryId } from '@/lib/repository-types';
+import { GitHubError, inspectRepository } from '@/features/repositories/github-server';
+import { repositoryId } from '@/features/repositories/repository-types';
 
 export async function POST(request: Request) {
   if (request.headers.get('origin') !== new URL(request.url).origin) return Response.json({ error: '허용되지 않은 요청입니다.' }, { status: 403 });
