@@ -26,8 +26,9 @@ export async function boundedText(response: Response, limit: number): Promise<st
 }
 
 export async function github(path: string, accept = 'application/vnd.github+json'): Promise<Response> {
+  const token = process.env.GITHUB_TOKEN?.trim();
   const response = await fetch(`https://api.github.com${path}`, {
-    headers: { Accept: accept, 'User-Agent': 'RepoFit', 'X-GitHub-Api-Version': '2022-11-28' },
+    headers: { Accept: accept, 'User-Agent': 'RepoFit', 'X-GitHub-Api-Version': '2022-11-28', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     signal: AbortSignal.timeout(12000), redirect: 'manual',
   });
   if (response.status === 404) throw new GitHubError('공개 레포를 찾지 못했습니다. 주소와 공개 여부를 확인해 주세요.', 404);

@@ -43,13 +43,33 @@ try {
   const candidate = { id: 'TanStack/query', description: 'Server state query library', dependencies: {}, packageName: '@tanstack/react-query' };
   const plan = integrationPlan(project, candidate);
   assert.equal(plan.existing, '^5.0.0'); assert.ok(plan.paths.every(path => project.paths.includes(path))); assert.ok(!plan.paths.includes('.env'));
-  const { boundedText, getTrending, inspectRepository } = require(join(temporary, 'github-server.js'));
+  const { github, boundedText, getTrending, inspectRepository } = require(join(temporary, 'github-server.js'));
   await assert.rejects(() => boundedText(new Response('x'.repeat(100)), 10));
   assert.equal(await boundedText(new Response('한글'), 10), '한글');
   const originalFetch = globalThis.fetch;
+  const originalToken = process.env.GITHUB_TOKEN;
+  try {
+    for (const token of [undefined, '', '   ', '  repofit-test-token  ']) {
+      if (token === undefined) delete process.env.GITHUB_TOKEN;
+      else process.env.GITHUB_TOKEN = token;
+      globalThis.fetch = async (url, options) => {
+        assert.equal(url, 'https://api.github.com/repos/owner/app');
+        assert.equal(options.headers.Authorization, token?.trim() ? 'Bearer repofit-test-token' : undefined);
+        assert.equal(options.headers.Accept, 'application/vnd.github.raw+json');
+        assert.equal(options.redirect, 'manual', 'Credentials must not follow redirects');
+        return Response.json({});
+      };
+      await github('/repos/owner/app', 'application/vnd.github.raw+json');
+    }
+  } finally {
+    if (originalToken === undefined) delete process.env.GITHUB_TOKEN;
+    else process.env.GITHUB_TOKEN = originalToken;
+    globalThis.fetch = originalFetch;
+  }
   let offline = false;
   const upstream = [];
-  globalThis.fetch = async url => {
+  globalThis.fetch = async (url, options) => {
+    assert.equal(options.headers.Authorization, undefined, 'Trending HTML never receives a token');
     upstream.push(url);
     if (offline) throw new Error('offline');
     const period = new URL(url).searchParams.get('since');

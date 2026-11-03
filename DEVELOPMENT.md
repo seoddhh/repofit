@@ -11,7 +11,7 @@ npm ci
 npm run dev
 ```
 
-기본 주소는 `http://localhost:5173`입니다. GitHub와 GitHub API에 대한 서버 측 HTTPS 연결이 필요합니다. 별도 키 없이 공개 레포를 읽으며 GitHub의 비인증 요청 한도에 영향을 받습니다.
+기본 주소는 `http://localhost:5173`입니다. GitHub와 GitHub API에 대한 서버 측 HTTPS 연결이 필요합니다. 별도 키 없이도 공개 레포를 읽습니다. 인증 조회를 사용하려면 Git에서 제외된 루트 `.env.local`에 `GITHUB_TOKEN=발급받은_PAT`를 설정한 뒤 개발 서버를 재시작합니다. 토큰이 비어 있으면 비인증으로 요청하며, 설정한 토큰은 서버의 GitHub REST API 요청에만 사용합니다. GitHub Trending HTML 요청에는 전달하지 않습니다. 배포 환경에는 같은 이름의 런타임 비밀값을 별도로 등록해야 하며, `NEXT_PUBLIC_` 또는 `VITE_` 접두사를 붙이지 않습니다.
 
 ## 확인
 

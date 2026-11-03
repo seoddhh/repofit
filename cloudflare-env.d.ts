@@ -3,5 +3,6 @@ declare namespace Cloudflare {
     DB?: D1Database;
     BUCKET?: R2Bucket;
     REPOFIT_EDITOR_EMAIL?: string;
+    GITHUB_TOKEN?: string;
   }
 }
