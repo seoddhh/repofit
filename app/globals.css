@@ -637,7 +637,8 @@ dialog::backdrop { background: rgba(31,43,65,.19); -webkit-backdrop-filter: blur
 .sidebar, .topbar, .mobile-nav,
 .project-invitation, .agent-request, .agent-handoff, .agent-report,
 .project-form-section, .repository-summary, .candidate-section, .integration-review,
-.repo-list, .history-panel, .account-identity, .project-context, .agent-setup {
+.repo-list, .history-panel, .account-identity, .project-context, .agent-setup,
+.catalog-overview, .catalog-list, .catalog-search {
   border: 1px solid transparent;
   background: var(--glass-fill);
   box-shadow: var(--glass-shadow);
@@ -645,11 +646,13 @@ dialog::backdrop { background: rgba(31,43,65,.19); -webkit-backdrop-filter: blur
 }
 .project-invitation, .agent-request, .agent-handoff, .agent-report,
 .project-form-section, .repository-summary, .candidate-section, .integration-review,
-.repo-list, .history-panel, .account-identity, .project-context, .agent-setup { position: relative; }
+.repo-list, .history-panel, .account-identity, .project-context, .agent-setup,
+.catalog-overview, .catalog-list, .catalog-search { position: relative; }
 .sidebar::before, .topbar::before, .mobile-nav::before,
 .project-invitation::before, .agent-request::before, .agent-handoff::before, .agent-report::before,
 .project-form-section::before, .repository-summary::before, .candidate-section::before, .integration-review::before,
-.repo-list::before, .history-panel::before, .account-identity::before, .project-context::before, .agent-setup::before {
+.repo-list::before, .history-panel::before, .account-identity::before, .project-context::before, .agent-setup::before,
+.catalog-overview::before, .catalog-list::before, .catalog-search::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -918,18 +921,20 @@ dialog::backdrop { background: rgba(31,43,65,.19); -webkit-backdrop-filter: blur
 @media(prefers-reduced-transparency: reduce) {
   :root { --surface: #fff; }
   body { background-image: none; }
-  .sidebar, .topbar, .mobile-nav, .detail-dialog, .center-dialog, .account-popover, .toast, .list-toolbar { background: #f8f9fc; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .sidebar, .topbar, .mobile-nav, .detail-dialog, .center-dialog, .account-popover, .toast, .list-toolbar, .catalog-overview, .catalog-list, .catalog-search { background: #f8f9fc; -webkit-backdrop-filter: none; backdrop-filter: none; }
   .project-invitation, .search-field, .select-field select, .secondary-button { background: #fff; }
-  .agent-request, .agent-handoff, .agent-report, .project-form-section, .repository-summary, .candidate-section, .integration-review, .repo-list, .history-panel, .account-identity, .project-context, .agent-setup { background: #fff; -webkit-backdrop-filter: none; backdrop-filter: none; border-color: var(--line); }
+  .agent-request, .agent-handoff, .agent-report, .project-form-section, .repository-summary, .candidate-section, .integration-review, .repo-list, .history-panel, .account-identity, .project-context, .agent-setup,
+  .catalog-overview, .catalog-list, .catalog-search { background: #fff; -webkit-backdrop-filter: none; backdrop-filter: none; border-color: var(--line); }
   .primary-button, .secondary-button, .invitation-action, .sidebar-add, .sidebar-repo, .login-button, .nav-item.active, .mobile-nav > a.active { background: #e1eefb; -webkit-backdrop-filter: none; backdrop-filter: none; }
   dialog::backdrop { background: #25344b66; -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
 @media(prefers-contrast: more) {
   :root { --muted: #424a56; --line: #aab4c3; --glass-border: #aab4c3; --glass: #f7f9fc; --surface: #fff; }
-  .sidebar, .topbar, .mobile-nav, .center-dialog, .detail-dialog, .list-toolbar, .agent-request, .agent-handoff, .agent-report, .project-form-section, .repository-summary, .candidate-section, .integration-review, .repo-list, .history-panel, .account-identity, .project-context, .agent-setup { background: #f7f9fc; border-color: var(--line); }
+  .sidebar, .topbar, .mobile-nav, .center-dialog, .detail-dialog, .list-toolbar, .agent-request, .agent-handoff, .agent-report, .project-form-section, .repository-summary, .candidate-section, .integration-review, .repo-list, .history-panel, .account-identity, .project-context, .agent-setup,
+  .catalog-overview, .catalog-list, .catalog-search { background: #f7f9fc; border-color: var(--line); }
   .primary-button, .secondary-button, .invitation-action, .sidebar-add, .sidebar-repo, .login-button, .nav-item.active, .mobile-nav > a.active { background: #daeaff; color: #163e6c; border-color: #6e8eae; }
 }
-@supports not (backdrop-filter: blur(1px)) { .sidebar, .topbar, .mobile-nav, .detail-dialog, .center-dialog, .account-popover, .toast, .list-toolbar { background: #f8f9fc; } }
+@supports not (backdrop-filter: blur(1px)) { .sidebar, .topbar, .mobile-nav, .detail-dialog, .center-dialog, .account-popover, .toast, .list-toolbar, .catalog-overview, .catalog-list, .catalog-search { background: #f8f9fc; } }
 
 .coach-intro { display: flex; align-items: center; gap: 17px; padding: 23px 26px; margin-bottom: 14px; }
 .coach-intro > svg { color: var(--accent); }
@@ -1003,7 +1008,7 @@ dialog::backdrop { background: rgba(31,43,65,.19); -webkit-backdrop-filter: blur
 
 /* Saved skills catalog: retain RepoFit's surfaces, type and interaction tokens. */
 .catalog-heading h1 { font-size: clamp(25px, 3vw, 34px); letter-spacing: -.045em; }
-.catalog-overview { display: flex; align-items: center; justify-content: space-between; gap: 28px; padding: 30px 32px; margin: 10px 0 32px; border: 1px solid var(--line); border-radius: 20px; background: linear-gradient(110deg, var(--surface), #e9f1f8); }
+.catalog-overview { display: flex; align-items: center; justify-content: space-between; gap: 28px; padding: 30px 32px; margin: 10px 0 32px; border-radius: var(--radius); }
 .catalog-kicker { display: inline-flex; align-items: center; gap: 8px; color: var(--accent); font-size: 12px; font-weight: 600; }
 .catalog-overview h2 { font-size: 24px; letter-spacing: -.035em; margin: 14px 0 10px; }
 .catalog-overview p { color: var(--muted); line-height: 1.8; font-size: 14px; }
@@ -1015,25 +1020,26 @@ dialog::backdrop { background: rgba(31,43,65,.19); -webkit-backdrop-filter: blur
 .catalog-sidebar { position: sticky; top: 90px; }
 .catalog-filter-title { display: flex; align-items: center; gap: 9px; color: var(--muted); margin: 0 10px 14px; }
 .catalog-filter-title h2 { font-size: 13px; font-weight: 600; }
-.catalog-sidebar nav { display: flex; flex-direction: column; gap: 3px; }
-.catalog-sidebar nav button { display: flex; justify-content: space-between; gap: 8px; width: 100%; padding: 12px; min-height: 44px; text-align: left; border-radius: 9px; font-size: 13px; color: var(--muted); transition: background .15s, color .15s; }
+.catalog-sidebar nav { display: flex; flex-direction: column; gap: 3px; padding: 5px; border: 1px solid #ffffff66; border-radius: 20px; background: #8daed112; box-shadow: inset 0 1px 3px #5672950a; }
+.catalog-sidebar nav button { display: flex; justify-content: space-between; gap: 8px; width: 100%; padding: 12px; min-height: 44px; text-align: left; border: 1px solid transparent; border-radius: 999px; font-size: 13px; color: var(--muted); transition: background .15s, color .15s, box-shadow .15s; }
 .catalog-sidebar nav button span { font-size: 11px; opacity: .75; font-variant-numeric: tabular-nums; }
 .catalog-sidebar nav button:hover { background: var(--surface); color: var(--text); }
-.catalog-sidebar nav button.selected { background: #dce9f5; color: #215889; font-weight: 650; }
+.catalog-sidebar nav button.selected { background: var(--control-fill); border-color: var(--control-border); box-shadow: var(--control-shadow); color: #23588d; font-weight: 650; }
 .catalog-sidebar-note { display: flex; gap: 9px; margin: 24px 10px; color: var(--muted); }
 .catalog-sidebar-note svg { flex-shrink: 0; margin-top: 3px; }
 .catalog-sidebar-note p { font-size: 12px; line-height: 1.8; }
-.catalog-search { display: flex; align-items: center; gap: 12px; min-height: 54px; border: 1px solid var(--line); border-radius: 12px; padding: 0 15px; background: var(--surface); color: var(--muted); }
+.catalog-search { display: flex; align-items: center; gap: 12px; min-height: 54px; border-radius: 16px; padding: 0 15px; color: var(--muted); }
 .catalog-search:focus-within { outline: 2px solid var(--accent); outline-offset: 3px; }
 .catalog-search input { flex: 1; min-width: 0; border: 0; background: transparent; outline: none; height: 52px; color: var(--text); font-size: 14px; }
 .catalog-results-heading { display: flex; align-items: baseline; justify-content: space-between; margin: 26px 0 12px; gap: 15px; }
 .catalog-results-heading h2 { font-size: 15px; }
 .catalog-results-heading h2 span { font-weight: 400; color: var(--muted); margin-left: 5px; }
 .catalog-results-heading > span { font-size: 11px; color: var(--muted); }
-.catalog-list { list-style: none; padding: 0; margin: 0; border-top: 1px solid var(--line); }
+.catalog-list { list-style: none; padding: 0; margin: 0; border-radius: var(--radius); overflow: hidden; }
+.catalog-list > li:last-child { border-bottom: 0; }
 .catalog-list > li { border-bottom: 1px solid var(--line); }
-.catalog-row { display: flex; align-items: center; gap: 18px; text-align: left; width: 100%; padding: 24px 8px; transition: background .15s; border-radius: 8px; }
-.catalog-row:hover { background: var(--surface); }
+.catalog-row { display: flex; align-items: center; gap: 18px; text-align: left; width: 100%; padding: 24px 22px; transition: background .15s; }
+.catalog-row:hover { background: #ffffff40; }
 .catalog-rank { width: 30px; align-self: flex-start; padding-top: 3px; flex-shrink: 0; color: var(--muted); font-size: 12px; font-family: var(--font-mono); }
 .catalog-row-copy { flex: 1; min-width: 0; }
 .catalog-row-title { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
@@ -1254,7 +1260,7 @@ dialog::backdrop { background: rgba(31,43,65,.19); -webkit-backdrop-filter: blur
 @media (prefers-contrast: more) { .detail-dialog.catalog-dialog { background: #f7f9fc; border-color: var(--line); } }
 @supports not (backdrop-filter: blur(1px)) { .detail-dialog.catalog-dialog { background: #f7f9fc; } }
 @media (max-width: 1050px) { .catalog-overview { align-items: start; } .catalog-overview-stats { flex-direction: column; gap: 18px; } .catalog-layout { grid-template-columns: 180px minmax(0,1fr); gap: 22px; } }
-@media (max-width: 700px) { .catalog-heading { align-items: flex-start; flex-direction: column; gap: 17px; } .catalog-overview { flex-direction: column; padding: 24px; gap: 23px; } .catalog-overview-stats { flex-direction: row; gap: 30px; } .catalog-overview-stats strong { font-size: 20px; } .catalog-layout { display: block; } .catalog-sidebar { position: static; margin-bottom: 20px; } .catalog-sidebar nav { flex-direction: row; overflow-x: auto; padding-bottom: 7px; } .catalog-sidebar nav button { width: auto; flex-shrink: 0; white-space: nowrap; border: 1px solid var(--line); gap: 12px; } .catalog-sidebar-note { display: none; } .catalog-filter-title { margin-left: 0; } .catalog-row { gap: 10px; padding: 21px 2px; } .catalog-rank { width: 25px; font-size: 11px; } .catalog-installs { min-width: 56px; } .catalog-installs strong { font-size: 11px; } .catalog-row-arrow { display: none; } .catalog-row-copy p { font-size: 12px; } .catalog-detail { padding: 18px 23px 28px; } .catalog-detail-pair { grid-template-columns: 1fr; gap: 20px; } .catalog-detail-date { align-items: flex-start; } .catalog-detail-date svg { flex-shrink: 0; margin-top: 3px; } }
+@media (max-width: 700px) { .catalog-heading { align-items: flex-start; flex-direction: column; gap: 17px; } .catalog-overview { flex-direction: column; padding: 24px; gap: 23px; } .catalog-overview-stats { flex-direction: row; gap: 30px; } .catalog-overview-stats strong { font-size: 20px; } .catalog-layout { display: block; } .catalog-sidebar { position: static; margin-bottom: 20px; } .catalog-sidebar nav { flex-direction: row; overflow-x: auto; padding-bottom: 7px; } .catalog-sidebar nav button { width: auto; flex-shrink: 0; white-space: nowrap; border: 1px solid var(--line); gap: 12px; } .catalog-sidebar-note { display: none; } .catalog-filter-title { margin-left: 0; } .catalog-row { gap: 10px; padding: 21px 14px; } .catalog-rank { width: 25px; font-size: 11px; } .catalog-installs { min-width: 56px; } .catalog-installs strong { font-size: 11px; } .catalog-row-arrow { display: none; } .catalog-row-copy p { font-size: 12px; } .catalog-detail { padding: 18px 23px 28px; } .catalog-detail-pair { grid-template-columns: 1fr; gap: 20px; } .catalog-detail-date { align-items: flex-start; } .catalog-detail-date svg { flex-shrink: 0; margin-top: 3px; } }
 
 /* Skill-led usage analysis: start, handoff, progress, report. */
 .usage-analysis-start { padding: 30px; overflow: hidden; }
