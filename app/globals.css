@@ -638,7 +638,7 @@ dialog::backdrop { background: rgba(31,43,65,.19); -webkit-backdrop-filter: blur
 .project-invitation, .agent-request, .agent-handoff, .agent-report,
 .project-form-section, .repository-summary, .candidate-section, .integration-review,
 .repo-list, .history-panel, .account-identity, .project-context, .agent-setup,
-.catalog-overview, .catalog-list, .catalog-search {
+.catalog-overview, .catalog-list, .catalog-search, .usage-report {
   border: 1px solid transparent;
   background: var(--glass-fill);
   box-shadow: var(--glass-shadow);
@@ -647,12 +647,12 @@ dialog::backdrop { background: rgba(31,43,65,.19); -webkit-backdrop-filter: blur
 .project-invitation, .agent-request, .agent-handoff, .agent-report,
 .project-form-section, .repository-summary, .candidate-section, .integration-review,
 .repo-list, .history-panel, .account-identity, .project-context, .agent-setup,
-.catalog-overview, .catalog-list, .catalog-search { position: relative; }
+.catalog-overview, .catalog-list, .catalog-search, .usage-report { position: relative; }
 .sidebar::before, .topbar::before, .mobile-nav::before,
 .project-invitation::before, .agent-request::before, .agent-handoff::before, .agent-report::before,
 .project-form-section::before, .repository-summary::before, .candidate-section::before, .integration-review::before,
 .repo-list::before, .history-panel::before, .account-identity::before, .project-context::before, .agent-setup::before,
-.catalog-overview::before, .catalog-list::before, .catalog-search::before {
+.catalog-overview::before, .catalog-list::before, .catalog-search::before, .usage-report::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -921,20 +921,20 @@ dialog::backdrop { background: rgba(31,43,65,.19); -webkit-backdrop-filter: blur
 @media(prefers-reduced-transparency: reduce) {
   :root { --surface: #fff; }
   body { background-image: none; }
-  .sidebar, .topbar, .mobile-nav, .detail-dialog, .center-dialog, .account-popover, .toast, .list-toolbar, .catalog-overview, .catalog-list, .catalog-search { background: #f8f9fc; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .sidebar, .topbar, .mobile-nav, .detail-dialog, .center-dialog, .account-popover, .toast, .list-toolbar, .catalog-overview, .catalog-list, .catalog-search, .usage-report { background: #f8f9fc; -webkit-backdrop-filter: none; backdrop-filter: none; }
   .project-invitation, .search-field, .select-field select, .secondary-button { background: #fff; }
   .agent-request, .agent-handoff, .agent-report, .project-form-section, .repository-summary, .candidate-section, .integration-review, .repo-list, .history-panel, .account-identity, .project-context, .agent-setup,
-  .catalog-overview, .catalog-list, .catalog-search { background: #fff; -webkit-backdrop-filter: none; backdrop-filter: none; border-color: var(--line); }
+  .catalog-overview, .catalog-list, .catalog-search, .usage-report { background: #fff; -webkit-backdrop-filter: none; backdrop-filter: none; border-color: var(--line); }
   .primary-button, .secondary-button, .invitation-action, .sidebar-add, .sidebar-repo, .login-button, .nav-item.active, .mobile-nav > a.active { background: #e1eefb; -webkit-backdrop-filter: none; backdrop-filter: none; }
   dialog::backdrop { background: #25344b66; -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
 @media(prefers-contrast: more) {
   :root { --muted: #424a56; --line: #aab4c3; --glass-border: #aab4c3; --glass: #f7f9fc; --surface: #fff; }
   .sidebar, .topbar, .mobile-nav, .center-dialog, .detail-dialog, .list-toolbar, .agent-request, .agent-handoff, .agent-report, .project-form-section, .repository-summary, .candidate-section, .integration-review, .repo-list, .history-panel, .account-identity, .project-context, .agent-setup,
-  .catalog-overview, .catalog-list, .catalog-search { background: #f7f9fc; border-color: var(--line); }
+  .catalog-overview, .catalog-list, .catalog-search, .usage-report { background: #f7f9fc; border-color: var(--line); }
   .primary-button, .secondary-button, .invitation-action, .sidebar-add, .sidebar-repo, .login-button, .nav-item.active, .mobile-nav > a.active { background: #daeaff; color: #163e6c; border-color: #6e8eae; }
 }
-@supports not (backdrop-filter: blur(1px)) { .sidebar, .topbar, .mobile-nav, .detail-dialog, .center-dialog, .account-popover, .toast, .list-toolbar, .catalog-overview, .catalog-list, .catalog-search { background: #f8f9fc; } }
+@supports not (backdrop-filter: blur(1px)) { .sidebar, .topbar, .mobile-nav, .detail-dialog, .center-dialog, .account-popover, .toast, .list-toolbar, .catalog-overview, .catalog-list, .catalog-search, .usage-report { background: #f8f9fc; } }
 
 .coach-intro { display: flex; align-items: center; gap: 17px; padding: 23px 26px; margin-bottom: 14px; }
 .coach-intro > svg { color: var(--accent); }
@@ -1092,8 +1092,8 @@ dialog::backdrop { background: rgba(31,43,65,.19); -webkit-backdrop-filter: blur
 .usage-runs li > button:first-child { flex: 1; text-align: left; padding: 12px 6px; }
 .usage-runs span { display: block; margin-top: 5px; font-size: 12px; color: var(--muted); }
 .usage-runs .selected { color: var(--accent); }
-.usage-report { --report-paper: #fbfcfe; --report-soft: #f0f5fb; --report-ink: #243448; --report-rule: #dfe6ee; overflow: hidden; min-width: 0; background: var(--report-paper); border: 1px solid #fff; border-radius: 22px; box-shadow: 0 12px 36px #2844670c, 0 1px 3px #2844670a; color: var(--report-ink); }
-.usage-report-header { padding: 32px 34px 27px; border-bottom: 1px solid var(--report-rule); background: linear-gradient(125deg, #fff 35%, #edf4fe); }
+.usage-report { --report-soft: #e8f1fc66; --report-ink: #243448; --report-rule: var(--line); overflow: hidden; min-width: 0; border-radius: var(--radius); color: var(--report-ink); overflow-wrap: anywhere; }
+.usage-report-header { padding: 32px 34px 27px; border-bottom: 1px solid var(--report-rule); background: linear-gradient(125deg, #ffffff52 35%, #dceafe4d); }
 .usage-report-topline { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 29px; }
 .usage-report-topline > span:first-child { display: flex; align-items: center; gap: 7px; font-size: 10px; letter-spacing: .1em; font-weight: 650; color: #536b86; }
 .usage-report-status { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; border-radius: 6px; font-size: 11px; background: #eaf0f7; color: #46607c; }
@@ -1105,7 +1105,7 @@ dialog::backdrop { background: rgba(31,43,65,.19); -webkit-backdrop-filter: blur
 .usage-report-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 17px; margin-top: 23px; }
 .usage-report-actions button { min-height: 44px; font-size: 12px; }
 .usage-report-body { padding: 28px 34px 34px; }
-.usage-report-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid var(--report-rule); border-radius: 12px; background: #fff; padding: 20px 0; }
+.usage-report-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid var(--report-rule); border-radius: 16px; background: #ffffff42; box-shadow: var(--surface-shadow); padding: 20px 0; }
 .usage-report-metrics > div { padding: 0 18px; }
 .usage-report-metrics > div + div { border-left: 1px solid var(--report-rule); }
 .usage-report-metrics > div > span { display: flex; align-items: center; gap: 6px; color: #65758a; font-size: 11px; }
@@ -1131,7 +1131,7 @@ dialog::backdrop { background: rgba(31,43,65,.19); -webkit-backdrop-filter: blur
 .usage-report-finding-body { display: grid; gap: 20px; padding: 0 12px 23px 44px; }
 .usage-report h5 { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; font-size: 12px; font-weight: 650; color: #526b87; }
 .usage-report-finding-body p { font-size: 14px; line-height: 1.9; color: #415267; }
-.usage-report-need { padding: 17px 19px; border: 1px solid #dce7f3; border-radius: 9px; background: #f0f5fb; }
+.usage-report-need { padding: 17px 19px; border: 1px solid #dce7f3; border-radius: 12px; background: var(--report-soft); }
 .usage-report-related { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 13px; }
 .usage-report-related span { display: inline-flex; align-items: center; gap: 5px; padding: 4px 7px; border: 1px solid #cfdfee; border-radius: 5px; background: #fff; color: #38638e; font-size: 11px; overflow-wrap: anywhere; }
 .usage-report-sources > summary { display: flex; align-items: center; gap: 7px; min-height: 44px; list-style: none; font-size: 11px; cursor: pointer; color: #667486; }
@@ -1142,22 +1142,22 @@ dialog::backdrop { background: rgba(31,43,65,.19); -webkit-backdrop-filter: blur
 .usage-finding-status.confirmed_issue { border-color: #ebd5cd; background: #fcf1ec; color: #93502e; }
 .usage-finding-status.insufficient_evidence, .usage-finding-status.not_applicable { border-color: #dce2e9; background: #f2f4f7; color: #5e6d7d; }
 .usage-finding-status.working_well { border-color: #d6e7db; background: #edf6f0; color: #306543; }
-.usage-report-assessment { display: grid; gap: 18px; padding: 18px; border: 1px solid var(--report-rule); border-radius: 9px; background: #fff; }
+.usage-report-assessment { display: grid; gap: 18px; padding: 18px; border: 1px solid var(--report-rule); border-radius: 12px; background: #ffffff42; }
 .usage-report-assessment .usage-report-chip { margin-bottom: 7px; }
 .usage-report-assessment p, .usage-report-finding-body .usage-report-legacy { font-size: 12px; }
 .usage-report-evidence { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 10px; }
-.usage-report-evidence li { padding: 12px 14px; border-left: 2px solid #b4c9e1; background: #f0f5fb; border-radius: 0 6px 6px 0; }
+.usage-report-evidence li { padding: 12px 14px; border-left: 2px solid #b4c9e1; background: var(--report-soft); border-radius: 0 6px 6px 0; }
 .usage-report-evidence li > div { display: flex; align-items: center; flex-wrap: wrap; gap: 5px 9px; }
 .usage-report-evidence strong { font-size: 11px; font-weight: 600; color: #41638a; }
 .usage-report-evidence span { padding: 0; border: 0; }
 .usage-report-evidence p { margin-top: 6px; font-size: 12px; }
-.usage-report-strengths { margin-top: 25px; padding: 20px; border: 1px solid #dce9df; border-radius: 10px; background: #f1f7f3; }
+.usage-report-strengths { margin-top: 25px; padding: 20px; border: 1px solid #dce9df; border-radius: 14px; background: #e5f2e966; }
 .usage-report-strengths h3 { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #306543; }
 .usage-report-strengths ul { list-style: none; padding: 0; margin: 15px 0 0; display: grid; gap: 10px; }
 .usage-report-strengths li { display: flex; gap: 8px; font-size: 13px; line-height: 1.8; color: #43594b; }
 .usage-report-strengths li svg { margin-top: 4px; color: #4b825e; }
 .usage-report-skills { display: grid; gap: 22px; }
-.usage-skill-card { border: 1px solid #dce5ef; border-radius: 12px; padding: 22px; background: #fff; min-width: 0; }
+.usage-skill-card { border: 1px solid #dce5ef; border-radius: 16px; padding: 22px; background: #ffffff42; box-shadow: var(--surface-shadow); min-width: 0; }
 .usage-skill-card-heading { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 12px; }
 .usage-skill-card-heading > div { flex: 1; min-width: 100px; }
 .usage-skill-card h4 { margin-top: 4px; font-size: 20px; letter-spacing: -.04em; overflow-wrap: anywhere; }
@@ -1172,8 +1172,8 @@ dialog::backdrop { background: rgba(31,43,65,.19); -webkit-backdrop-filter: blur
 .usage-report-two-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 21px; margin-top: 20px; }
 .usage-report-outcome p, .usage-report-outcome li { color: #4d5e71; font-size: 12px; line-height: 1.9; }
 .usage-report-outcome ul { padding-left: 16px; margin: 0; }
-.usage-report-prompt { margin-top: 20px; border: 1px solid #dce5ef; border-radius: 9px; overflow: hidden; background: #f5f8fc; }
-.usage-report-prompt > div { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px; padding: 4px 12px; background: #edf2f8; }
+.usage-report-prompt { margin-top: 20px; border: 1px solid #dce5ef; border-radius: 12px; overflow: hidden; background: #ffffff42; }
+.usage-report-prompt > div { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px; padding: 4px 12px; background: #dfeafa52; }
 .usage-report-prompt > div > span { color: #596d85; font-size: 10px; }
 .usage-report-prompt button { display: inline-flex; align-items: center; gap: 5px; min-height: 36px; font-size: 11px; color: #38638e; }
 .usage-report-prompt > p { padding: 14px; font-size: 13px; line-height: 1.85; color: #304861; white-space: pre-wrap; }
@@ -1195,7 +1195,7 @@ dialog::backdrop { background: rgba(31,43,65,.19); -webkit-backdrop-filter: blur
 .usage-skill-footer span, .usage-skill-footer a { display: inline-flex; align-items: center; gap: 5px; color: #667486; font-size: 10px; }
 .usage-skill-footer a { color: #356696; min-height: 36px; }
 .usage-report-habits { display: grid; gap: 16px; }
-.usage-report-habits > article { padding: 21px; border: 1px solid var(--report-rule); border-radius: 10px; background: #fff; }
+.usage-report-habits > article { padding: 21px; border: 1px solid var(--report-rule); border-radius: 14px; background: #ffffff42; box-shadow: var(--surface-shadow); }
 .usage-report-habits h4 { margin-top: 7px; font-size: 14px; line-height: 1.8; }
 .usage-report-unmet { margin-top: 28px; padding: 20px; border: 1px dashed #d2deeb; border-radius: 10px; }
 .usage-report-unmet h3 { font-size: 14px; }
@@ -1209,7 +1209,7 @@ dialog::backdrop { background: rgba(31,43,65,.19); -webkit-backdrop-filter: blur
 .usage-report-method p, .usage-report-method li { font-size: 12px; line-height: 1.9; color: #667486; }
 .usage-report-method ul { padding-left: 17px; margin: 12px 0; }
 .usage-report-method button { font-size: 11px; min-height: 44px; }
-.usage-report-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 16px 34px; border-top: 1px solid var(--report-rule); background: #f4f7fb; color: #6c7f96; font-size: 10px; }
+.usage-report-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 16px 34px; border-top: 1px solid var(--report-rule); background: #ffffff26; color: #6c7f96; font-size: 10px; }
 .usage-report-footer > span:first-child { display: flex; align-items: center; gap: 6px; }
 .usage-report-progress { margin-top: 25px; padding: 20px; border: 1px solid var(--report-rule); border-radius: 10px; }
 .usage-report-progress ol { list-style: none; padding: 0; margin: 0 0 20px; display: grid; gap: 16px; }
@@ -1251,7 +1251,7 @@ dialog::backdrop { background: rgba(31,43,65,.19); -webkit-backdrop-filter: blur
   .usage-skill-card-heading .usage-report-chip { margin-left: 42px; }
   .usage-report-footer { padding: 16px 22px; font-size: 9px; }
 }
-@media (prefers-contrast: more) { .usage-report { --report-paper: #fff; --report-rule: #8c9db1; } .usage-report-overline, .usage-report-meta, .usage-report-section-title p { color: #465a72; } }
+@media (prefers-contrast: more) { .usage-report { --report-rule: #8c9db1; } .usage-report-overline, .usage-report-meta, .usage-report-section-title p { color: #465a72; } }
 .catalog-detail .catalog-personal-note { border-color: var(--glass-border); background: #ffffff42; box-shadow: var(--surface-shadow); }
 .catalog-detail-source { border-top: 1px solid var(--line); padding-top: 23px; margin-top: 28px; }
 .catalog-detail-source a { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
