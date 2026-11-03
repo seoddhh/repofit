@@ -1,7 +1,9 @@
 'use client';
 import { useEffect, useRef, type ReactNode } from 'react';
 
-export function RepositoryContentPanel({ children }: { children: ReactNode }) {
+export function RepositoryContentPanel({ children, className = 'trending-explanation-panel', viewportClassName = 'trending-explanation', label = '오픈소스 상세 설명' }: {
+  children: ReactNode; className?: string; viewportClassName?: string; label?: string;
+}) {
   const panelRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -61,11 +63,11 @@ export function RepositoryContentPanel({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  return <div ref={panelRef} className="trending-explanation-panel">
-    <div ref={viewportRef} className="trending-explanation" role="region" aria-label="오픈소스 상세 설명" tabIndex={0}>
+  return <div ref={panelRef} className={`content-scroll-panel ${className}`}>
+    <div ref={viewportRef} className={`content-scroll-viewport ${viewportClassName}`} role="region" aria-label={label} tabIndex={0}>
       <div ref={contentRef}>{children}</div>
     </div>
-    <div className="trending-scroll-indicator" aria-hidden="true"><div ref={thumbRef} className="trending-scroll-thumb"/></div>
-    <div className="trending-scroll-fade" aria-hidden="true"/>
+    <div className="content-scroll-indicator" aria-hidden="true"><div ref={thumbRef} className="content-scroll-thumb"/></div>
+    <div className="content-scroll-fade" aria-hidden="true"/>
   </div>;
 }

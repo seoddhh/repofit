@@ -6,6 +6,7 @@ import { compactNumber } from '@/lib/repository-types';
 import { explanationPath, type BriefResponse } from '@/lib/brief-types';
 import { GithubIcon } from './github-icon';
 import { uiCopy, uiText } from '@/lib/ui-copy';
+import { RepositoryContentPanel } from './repository-content-panel';
 
 function checkedAt(value: string) {
   return new Date(value).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -59,7 +60,7 @@ export function RepositoryExplanation({ repository, embedded = false }: { reposi
       <section id="panel-overview" role="tabpanel" aria-labelledby="tab-overview" hidden={section !== 'overview'} tabIndex={0} className="explanation-panel">
         <div className="explanation-section"><h2><Lightbulb size={20}/>쉽게 말하면</h2><p className="explanation-lead">{uiText(article?.content.summary || evidence.description || '공식 저장소에 프로젝트 설명이 등록되지 않았습니다.')}</p></div>
         {article && <><div className="explanation-section"><h2>이럴 때 활용할 수 있어요</h2><ol className="explanation-usecases">{article.content.useCases.map((text, index) => <li key={text}><span>{String(index + 1).padStart(2, '0')}</span><p>{text}</p></li>)}</ol></div><div className="explanation-comparison"><div><h2><Check size={18}/>기대할 수 있는 점</h2><ul>{article.content.strengths.map(text => <li key={text}>{uiText(text)}</li>)}</ul></div><div><h2><ShieldCheck size={18}/>도입 전에 확인하세요</h2><ul>{article.content.limitations.map(text => <li key={text}>{uiText(text)}</li>)}</ul></div></div></>}
-        {!article && evidence.readme && <details className="explanation-readme"><summary>공식 README 원문 살펴보기</summary><pre>{evidence.readme}</pre></details>}
+        {!article && evidence.readme && <details className="explanation-readme"><summary>공식 README 원문 살펴보기</summary><RepositoryContentPanel className="readme-scroll-panel" viewportClassName="readme-scroll-viewport" label="공식 README 원문"><pre>{evidence.readme}</pre></RepositoryContentPanel></details>}
       </section>
       <section id="panel-trending" role="tabpanel" aria-labelledby="tab-trending" hidden={section !== 'trending'} tabIndex={0} className="explanation-panel">
         <div className="explanation-section"><h2><TrendingUp size={20}/>관심이 모이고 있다는 신호</h2>{evidence.trending ? <div className="explanation-trend-stats"><div><span>{trendingPeriodLabel} 전체 언어 트렌딩 순위</span><strong>#{evidence.trending.rank}</strong></div><div><span>{trendingPeriodLabel} 받은 스타</span><strong>{evidence.trending.today === null ? '미확인' : `+${evidence.trending.today.toLocaleString()}`}</strong></div><p>{evidence.trendingFetchedAt && `${checkedAt(evidence.trendingFetchedAt)} KST 수집`}{evidence.trendingStale ? ', 이전 수집 결과' : ''}</p></div> : <p>자료 수집 시점의 트렌딩 목록에는 없습니다.</p>}<p className="explanation-caveat">순위와 스타 증가는 관심의 신호입니다. 인기의 구체적인 원인이나 내 프로젝트와의 적합성을 입증하지는 않습니다.</p></div>
@@ -70,7 +71,7 @@ export function RepositoryExplanation({ repository, embedded = false }: { reposi
         <div className="explanation-section"><h2>시작하는 방법</h2><p>{article?.content.gettingStarted || '공식 README에서 설치 조건과 사용 예시를 먼저 확인하세요. 아직 설치 방법을 검토하지 않았습니다.'}</p></div>
         <div className="explanation-section"><h2><FileText size={19}/>해설의 근거</h2><div className="explanation-sources">{evidence.sources.map(source => <a href={source.url} key={source.url} target="_blank" rel="noreferrer"><FileText size={18}/><span>{uiText(source.title)}<small>{new URL(source.url).hostname}</small></span><ArrowUpRight size={15}/></a>)}</div><p className="explanation-caveat">{checkedAt(evidence.fetchedAt)} KST 공식 자료 확인{evidence.readmeSha ? `, README ${evidence.readmeSha.slice(0, 7)}` : ''}. 실제 설치와 코드 실행은 검증하지 않았습니다.</p></div>
         {evidence.warnings.length > 0 && <div className="explanation-notice"><CircleAlert size={16}/><ul>{evidence.warnings.map(text => <li key={text}>{uiText(text)}</li>)}</ul></div>}
-        {evidence.readme && <details className="explanation-readme"><summary>확인한 README 원문</summary><pre>{evidence.readme}</pre></details>}
+        {evidence.readme && <details className="explanation-readme"><summary>확인한 README 원문</summary><RepositoryContentPanel className="readme-scroll-panel" viewportClassName="readme-scroll-viewport" label="공식 README 원문"><pre>{evidence.readme}</pre></RepositoryContentPanel></details>}
       </section>
     </article>}
   </>;

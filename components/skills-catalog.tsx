@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, ArrowUpRight, BookOpen, Check, Clock3, Download, ListFilter, LoaderCircle, Puzzle, Search, X, Sparkles, ShieldCheck } from 'lucide-react';
 import { categoryLabels, type CatalogEntry, type CatalogSnapshot } from '@/lib/catalog-types';
 import { useModalDialog } from './use-modal-dialog';
+import { RepositoryContentPanel } from './repository-content-panel';
 
 const checked = (date: string) => new Date(date).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 export function SkillsCatalog({ initialQuery, initialSkill = '' }: { initialQuery: string; initialSkill?: string }) {
@@ -50,7 +51,7 @@ export function SkillsCatalog({ initialQuery, initialSkill = '' }: { initialQuer
 function SkillDetail({ skill, onClose }: { skill: CatalogEntry; onClose: () => void }) {
   const ref = useRef<HTMLDialogElement>(null); useModalDialog(ref);
   const e = skill.explanation;
-  return <dialog ref={ref} className="detail-dialog catalog-dialog" aria-labelledby="skill-detail-title" onCancel={onClose} onClick={event => { if (event.target === event.currentTarget) onClose(); }}><div className="catalog-detail">
+  return <dialog ref={ref} className="detail-dialog catalog-dialog" aria-labelledby="skill-detail-title" onCancel={onClose} onClick={event => { if (event.target === event.currentTarget) onClose(); }}><RepositoryContentPanel className="catalog-scroll-panel" viewportClassName="catalog-detail" label="스킬 상세 설명">
     <div className="catalog-detail-top"><span><Puzzle size={15}/> 스킬 가이드</span><button className="icon-button" onClick={onClose} aria-label="스킬 설명 닫기"><X size={21}/></button></div>
     <div className="catalog-detail-labels"><span className="catalog-category">{categoryLabels[e.category]}</span><span>누적 설치 #{skill.rank}</span></div><p className="explanation-owner">{skill.source}</p><h2 id="skill-detail-title">{skill.name}</h2><p className="catalog-detail-tagline">{e.tagline}</p>
     <div className="catalog-detail-actions"><a href={`/agent?skill=${encodeURIComponent(skill.id)}`} className="primary-button">내 활용과 비교하기 <ArrowRight size={16}/></a><a href={skill.url} target="_blank" rel="noreferrer" className="secondary-button">원문과 설치 안내 <ArrowUpRight size={15}/></a></div>
@@ -61,5 +62,5 @@ function SkillDetail({ skill, onClose }: { skill: CatalogEntry; onClose: () => v
     <section className="catalog-detail-pair"><div><h3><Sparkles size={18}/> 기대하는 변화</h3><ul>{e.benefits.map(text => <li key={text}>{text}</li>)}</ul><small>원문을 바탕으로 정리한 예상입니다. 실제 효과는 적용 후 확인하세요.</small></div><div><h3><ShieldCheck size={18}/> 먼저 확인하세요</h3><ul>{[...e.requirements, ...e.limitations].map(text => <li key={text}>{text}</li>)}</ul></div></section>
     <div className="catalog-personal-note"><div><h3>내 에이전트에서는 어떨까요?</h3><p>목표와 기존 스킬을 함께 비교해 필요한 이유와 적용 조건을 보고서로 확인하세요.</p></div><a href={`/agent?skill=${encodeURIComponent(skill.id)}`} className="text-button">나에게 맞게 살펴보기 <ArrowRight size={15}/></a></div>
     <footer className="catalog-detail-source"><a href={skill.url} target="_blank" rel="noreferrer">설명의 근거와 원문 <ArrowUpRight size={14}/></a><p>skills.sh 공개 원문을 읽고 한국어로 정리했습니다. 실제 설치와 실행 호환성은 검증하지 않았습니다.</p></footer>
-  </div></dialog>;
+  </RepositoryContentPanel></dialog>;
 }
