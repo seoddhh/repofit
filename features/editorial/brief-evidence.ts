@@ -1,44 +1,58 @@
-import { github, boundedText, GitHubError } from '../repositories/github-server';
-import type { TrendingSnapshot } from '../repositories/repository-types';
+import { githubJson, GitHubError } from '../repositories/github-server';
+import type { RepositoryOverview, TrendingSnapshot } from '../repositories/repository-types';
 import type { BriefEvidence } from './brief-types';
 
-export async function collectBriefEvidence(id: string, snapshot: TrendingSnapshot | null, strict = false): Promise<BriefEvidence> {
+type ReadmeDocument = { content?: string; encoding?: string; size?: number; sha?: string; html_url?: string; cachedText?: string | null };
+type ReleaseDocument = { name: string; tag_name: string; body: string; html_url: string; published_at: string; draft: boolean; prerelease: boolean };
+type EvidenceCache = { overview?: RepositoryOverview; previous?: BriefEvidence; previousCommitSha?: string };
+
+export async function collectBriefEvidence(id: string, snapshot: TrendingSnapshot | null, strict = false, cache: EvidenceCache = {}): Promise<BriefEvidence> {
   const base = `/repos/${id.split('/').map(encodeURIComponent).join('/')}`;
-  const metadata = JSON.parse(await boundedText(await github(base), 80000)) as {
-    full_name: string; private: boolean; description: string | null; language: string | null;
-    stargazers_count: number; license: { spdx_id: string } | null;
-  };
+  const { overview, previous } = cache;
+  const metadata = overview ? {
+    full_name: overview.id, private: false, description: overview.description, language: overview.language,
+    stargazers_count: overview.stars, license: overview.license ? { spdx_id: overview.license } : null,
+  } : (await githubJson<{ full_name: string; private: boolean; description: string | null; language: string | null; stargazers_count: number; license: { spdx_id: string } | null }>(base, 80000)).value;
   if (metadata.private !== false) throw new GitHubError('공개 저장소만 수집할 수 있습니다.', 403);
-  const warnings: string[] = [];
+  const repoUrl = `https://github.com/${metadata.full_name}`;
+  const sameCommit = Boolean(previous && overview && cache.previousCommitSha === overview.sha);
+  const previousReadme = previous ? { etag: previous.readmeEtag, value: { cachedText: previous.readme, sha: previous.readmeSha ?? undefined, html_url: previous.sources.find(source => source.title === '공식 README')?.url } } : undefined;
+  // The overview already read README at the inspected commit. Do not download it twice.
+  const readmeRequest = sameCommit ? Promise.resolve(previousReadme!) : overview ? Promise.resolve({
+    etag: overview.sourceEtags?.readme,
+    value: { cachedText: overview.readme, sha: overview.readmeSha ?? undefined, html_url: overview.readmePath ? `${repoUrl}/blob/${encodeURIComponent(overview.defaultBranch ?? overview.sha)}/${overview.readmePath.split('/').map(encodeURIComponent).join('/')}` : `${repoUrl}#readme` },
+  }) : githubJson<ReadmeDocument>(`${base}/readme`, 400000, previousReadme);
+  const oldRelease = previous?.release;
+  const cachedReleases: ReleaseDocument[] = oldRelease ? [{ name: oldRelease.name, tag_name: oldRelease.name, body: oldRelease.body, html_url: oldRelease.url, published_at: oldRelease.publishedAt, draft: false, prerelease: false }] : [];
   const [readmeResult, releaseResult] = await Promise.allSettled([
-    github(`${base}/readme`).then(r => boundedText(r, 400000)).then(text => JSON.parse(text) as { content?: string; encoding?: string; size?: number; sha?: string; html_url?: string }),
-    github(`${base}/releases?per_page=3`).then(r => boundedText(r, 800000)).then(text => JSON.parse(text) as { name: string; tag_name: string; body: string; html_url: string; published_at: string; draft: boolean; prerelease: boolean }[]),
+    readmeRequest,
+    // Releases can change without a commit: validate them independently with ETag.
+    githubJson<ReleaseDocument[]>(`${base}/releases?per_page=3`, 800000, previous ? { etag: previous.releaseEtag, value: cachedReleases } : undefined),
   ]);
   for (const result of [readmeResult, releaseResult]) {
     if (result.status === 'rejected' && result.reason instanceof GitHubError && result.reason.status === 429) throw result.reason;
     if (strict && result.status === 'rejected' && !(result.reason instanceof GitHubError && [404, 413].includes(result.reason.status))) throw result.reason;
   }
-  const repoUrl = `https://github.com/${metadata.full_name}`;
+  const warnings: string[] = sameCommit ? previous!.warnings.filter(warning => warning.includes('README')) : [];
   const sources = [{ title: '공식 GitHub 저장소', url: repoUrl }];
   let readme: string | null = null;
   let readmeSha: string | null = null;
-  if (readmeResult.status === 'fulfilled' && readmeResult.value.encoding === 'base64' && readmeResult.value.content && (readmeResult.value.size ?? Infinity) <= 256000) {
+  if (readmeResult.status === 'fulfilled') {
+    const file: ReadmeDocument = readmeResult.value.value;
     try {
-      const decoded = new TextDecoder().decode(Uint8Array.from(atob(readmeResult.value.content.replace(/\s/g, '')), c => c.charCodeAt(0)));
-      readme = decoded.slice(0, 20000);
-      if (decoded.length > 20000) warnings.push('긴 README의 앞부분 20,000자만 확인했습니다.');
-      readmeSha = readmeResult.value.sha ?? null;
-      sources.push({ title: '공식 README', url: readmeResult.value.html_url?.startsWith(`${repoUrl}/blob/`) ? readmeResult.value.html_url : `${repoUrl}#readme` });
+      const decoded = 'cachedText' in file ? file.cachedText : file.encoding === 'base64' && file.content && (file.size ?? Infinity) <= 256000 ? new TextDecoder().decode(Uint8Array.from(atob(file.content.replace(/\s/g, '')), c => c.charCodeAt(0))) : null;
+      if (decoded != null) {
+        readme = decoded.slice(0, 20000); readmeSha = file.sha ?? null;
+        if (decoded.length > 20000) warnings.push('긴 README의 앞부분 20,000자만 확인했습니다.');
+        sources.push({ title: '공식 README', url: file.html_url?.startsWith(`${repoUrl}/blob/`) ? file.html_url : `${repoUrl}#readme` });
+      } else if (!warnings.some(warning => warning.includes('README'))) warnings.push('README를 읽지 못했거나 읽기 제한을 초과했습니다.');
     } catch { warnings.push('README 텍스트를 해석하지 못했습니다.'); }
   } else warnings.push('README를 읽지 못했거나 읽기 제한을 초과했습니다.');
-  const latest = releaseResult.status === 'fulfilled' ? releaseResult.value.find(r => !r.draft && !r.prerelease) : null;
-  const release = latest && latest.html_url.startsWith(`${repoUrl}/releases/`) ? {
-    name: latest.name || latest.tag_name, publishedAt: latest.published_at,
-    body: (latest.body ?? '').slice(0, 12000), url: latest.html_url,
-  } : null;
+  const latest = releaseResult.status === 'fulfilled' ? releaseResult.value.value.find(release => !release.draft && !release.prerelease) : null;
+  const release = latest && latest.html_url.startsWith(`${repoUrl}/releases/`) ? { name: latest.name || latest.tag_name, publishedAt: latest.published_at, body: (latest.body ?? '').slice(0, 12000), url: latest.html_url } : null;
   if (release) sources.push({ title: `공식 릴리스, ${release.name}`, url: release.url });
   if (releaseResult.status === 'rejected') warnings.push('릴리스 자료를 확인하지 못했습니다.');
-  const trending = snapshot?.repositories.find(r => r.id.toLowerCase() === metadata.full_name.toLowerCase()) ?? null;
+  const trending = snapshot?.repositories.find(repo => repo.id.toLowerCase() === metadata.full_name.toLowerCase()) ?? null;
   const since = snapshot ? new URL(snapshot.sourceUrl).searchParams.get('since') : null;
   const trendingPeriod = since === 'weekly' || since === 'monthly' ? since : 'daily';
   const periodLabel = { daily: '오늘의', weekly: '이번 주', monthly: '이번 달' }[trendingPeriod];
@@ -47,6 +61,8 @@ export async function collectBriefEvidence(id: string, snapshot: TrendingSnapsho
     id: metadata.full_name, description: metadata.description ?? '', language: metadata.language,
     stars: metadata.stargazers_count, license: metadata.license?.spdx_id ?? null,
     readme, readmeSha, release, sources, trending, trendingPeriod,
+    readmeEtag: readmeResult.status === 'fulfilled' ? readmeResult.value.etag : undefined,
+    releaseEtag: releaseResult.status === 'fulfilled' ? releaseResult.value.etag : undefined,
     trendingFetchedAt: trending ? snapshot!.fetchedAt : null, trendingStale: snapshot?.stale ?? false,
     fetchedAt: new Date().toISOString(), warnings,
   };

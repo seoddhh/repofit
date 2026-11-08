@@ -59,6 +59,8 @@ export type BriefEvidence = {
   license: string | null;
   readme: string | null;
   readmeSha: string | null;
+  readmeEtag?: string;
+  releaseEtag?: string;
   release: { name: string; publishedAt: string; body: string; url: string } | null;
   trending: TrendingRepo | null;
   trendingPeriod?: TrendingPeriod;

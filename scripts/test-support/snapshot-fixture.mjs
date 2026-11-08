@@ -44,14 +44,19 @@ export function snapshotFixture() {
 
 export function mockSnapshotGitHub() {
   const lists = { daily: ['owner/first', 'owner/second'], weekly: ['OWNER/FIRST', 'owner/third'], monthly: ['owner/third'] };
-  let calls = 0, failure = null, stars = 100;
+  let calls = 0, failure = null, stars = 100, commit = 'a'.repeat(40), releaseName = null;
+  const requests = [];
   return {
     lists,
     get calls() { return calls; },
+    requests,
     fail(value) { failure = value; },
     setStars(value) { stars = value; },
-    async fetch(url) {
+    setCommit(value) { commit = value; },
+    setRelease(value) { releaseName = value; },
+    async fetch(url, options = {}) {
       calls++;
+      requests.push({ url, etag: options.headers?.['If-None-Match'] });
       if (failure === 'offline') throw new Error('offline');
       if (url.includes('github.com/trending')) {
         const period = new URL(url).searchParams.get('since');
@@ -59,12 +64,15 @@ export function mockSnapshotGitHub() {
         return new Response(lists[period].map(id => `<article class="Box-row"><h2><a href="/${id}">${id}</a></h2><p>Official tool</p><a href="/${id}/stargazers">${stars}</a><span>17 stars ${label}</span></article>`).join(''));
       }
       const id = url.match(/\/repos\/([^/]+\/[^/?]+)/)?.[1];
-      if (failure === 'quota' && url.includes('/readme')) return new Response('rate limited', { status: 429 });
-      if (url.includes('/git/ref/')) return Response.json({ object: { sha: 'a'.repeat(40) } });
-      if (url.includes('/git/trees/')) return Response.json({ tree: [{ path: 'src/app.ts', type: 'blob' }], truncated: false });
-      if (url.includes('/readme')) return Response.json({ content: Buffer.from('Official README. This tool supports documented workflows and examples.').toString('base64'), encoding: 'base64', size: 70, path: 'README.md', sha: 'b'.repeat(40), html_url: `https://github.com/${id}/blob/main/README.md` });
-      if (url.includes('/contents/package.json')) return Response.json({ name: 'fixture', dependencies: { react: '19' } });
-      if (url.includes('/releases')) return Response.json([]);
+      if (failure === 'quota' && /\/readme|\/releases/.test(url)) return new Response('rate limited', { status: 429 });
+      if (url.includes('/git/ref/')) return Response.json({ object: { sha: commit } });
+      const etag = url.includes('/git/trees/') ? `"tree-${commit}"` : url.includes('/readme') ? '"readme-v1"' : url.includes('/contents/package.json') ? '"package-v1"' : `"release-${releaseName ?? 'none'}"`;
+      if (options.headers?.['If-None-Match'] === etag) return new Response(null, { status: 304, headers: { ETag: etag } });
+      const headers = { ETag: etag };
+      if (url.includes('/git/trees/')) return Response.json({ tree: [{ path: 'src/app.ts', type: 'blob' }], truncated: false }, { headers });
+      if (url.includes('/readme')) return Response.json({ content: Buffer.from('Official README. This tool supports documented workflows and examples.').toString('base64'), encoding: 'base64', size: 70, path: 'README.md', sha: 'b'.repeat(40), html_url: `https://github.com/${id}/blob/main/README.md` }, { headers });
+      if (url.includes('/contents/package.json')) return Response.json({ name: 'fixture', dependencies: { react: '19' } }, { headers });
+      if (url.includes('/releases')) return Response.json(releaseName ? [{ name: releaseName, tag_name: releaseName, body: 'New official release', html_url: `https://github.com/${id}/releases/tag/${releaseName}`, published_at: '2026-11-08T00:00:00Z', draft: false, prerelease: false }] : [], { headers });
       return Response.json({ full_name: id, private: failure === 'private', description: 'Official tool', language: 'TypeScript', stargazers_count: stars, license: { spdx_id: 'MIT' }, default_branch: 'main' });
     },
   };

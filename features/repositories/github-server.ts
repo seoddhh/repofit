@@ -25,16 +25,23 @@ export async function boundedText(response: Response, limit: number): Promise<st
   return new TextDecoder().decode(bytes);
 }
 
-export async function github(path: string, accept = 'application/vnd.github+json'): Promise<Response> {
+export async function github(path: string, accept = 'application/vnd.github+json', etag?: string): Promise<Response> {
   const token = process.env.GITHUB_TOKEN?.trim();
   const response = await fetch(`https://api.github.com${path}`, {
-    headers: { Accept: accept, 'User-Agent': 'RepoFit', 'X-GitHub-Api-Version': '2022-11-28', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    headers: { Accept: accept, 'User-Agent': 'RepoFit', 'X-GitHub-Api-Version': '2022-11-28', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(etag ? { 'If-None-Match': etag } : {}) },
     signal: AbortSignal.timeout(12000), redirect: 'manual',
   });
   if (response.status === 404) throw new GitHubError('공개 레포를 찾지 못했습니다. 주소와 공개 여부를 확인해 주세요.', 404);
   if (response.status === 403 || response.status === 429) throw new GitHubError('GitHub 요청 한도에 도달했습니다. 잠시 후 다시 시도해 주세요.', 429);
+  if (response.status === 304 && etag) return response;
   if (!response.ok) throw new GitHubError('GitHub 자료를 불러오지 못했습니다. 다시 시도해 주세요.');
   return response;
+}
+
+export async function githubJson<T>(path: string, limit: number, previous?: { etag?: string; value: T }, accept = 'application/vnd.github+json'): Promise<{ value: T; etag?: string }> {
+  const response = await github(path, accept, previous?.etag);
+  if (response.status === 304) return { value: previous!.value, etag: previous!.etag };
+  return { value: JSON.parse(await boundedText(response, limit)) as T, etag: response.headers.get('etag') ?? undefined };
 }
 
 const trendingCache = new Map<TrendingPeriod, TrendingSnapshot>();
@@ -64,48 +71,56 @@ export async function getTrending(period: TrendingPeriod = 'daily', fresh = fals
 
 type Metadata = { full_name: string; private: boolean; description: string | null; language: string | null; stargazers_count: number; license: { spdx_id: string } | null; default_branch: string };
 type Tree = { tree: { path: string; type: string }[]; truncated: boolean };
+type Readme = { content?: string; encoding?: string; path?: string; size?: number; sha?: string; cachedText?: string | null };
+type Package = { name?: unknown; dependencies?: Record<string, unknown>; devDependencies?: Record<string, unknown> };
 const overviewCache = new Map<string, RepositoryOverview>();
 const safePath = (path: string) => !/(^|\/)(\.env[^/]*|credentials[^/]*|secrets?[^/]*|[^/]*\.(pem|key))($|\/)/i.test(path);
 
-export async function inspectRepository(id: string, fresh = false): Promise<RepositoryOverview> {
+export async function inspectRepository(id: string, fresh = false, previous?: RepositoryOverview): Promise<RepositoryOverview> {
   const cached = overviewCache.get(id.toLowerCase());
   if (!fresh && cached && Date.now() - Date.parse(cached.fetchedAt) < 300000) return cached;
   const base = `/repos/${id.split('/').map(encodeURIComponent).join('/')}`;
   const metadata: Metadata = JSON.parse(await boundedText(await github(base), 100000));
   if (metadata.private !== false) throw new GitHubError('공개 저장소만 수집할 수 있습니다.', 403);
+  if (previous && previous.id.toLowerCase() !== metadata.full_name.toLowerCase()) previous = undefined;
   const ref: { object: { sha: string } } = JSON.parse(await boundedText(await github(`${base}/git/ref/heads/${encodeURIComponent(metadata.default_branch)}`), 100000));
   const commit = { sha: ref.object.sha };
+  // Always check visibility and mutable metadata first, then reuse immutable commit content.
+  const current = { id: metadata.full_name, description: metadata.description ?? '', language: metadata.language, stars: metadata.stargazers_count, license: metadata.license?.spdx_id ?? null, defaultBranch: metadata.default_branch, sha: commit.sha, fetchedAt: new Date().toISOString() };
+  if (previous?.id.toLowerCase() === metadata.full_name.toLowerCase() && previous.sha === commit.sha) return { ...previous, ...current };
   const warnings: string[] = [];
   const results = await Promise.allSettled([
-    github(`${base}/git/trees/${commit.sha}?recursive=1`).then(response => boundedText(response, 3000000)).then(text => JSON.parse(text) as Tree),
-    github(`${base}/readme?ref=${commit.sha}`).then(response => boundedText(response, 120000)).then(text => JSON.parse(text) as { content?: string; encoding?: string; path?: string; size?: number }),
-    github(`${base}/contents/package.json?ref=${commit.sha}`, 'application/vnd.github.raw+json').then(response => boundedText(response, 64000)).then(text => JSON.parse(text) as { name?: unknown; dependencies?: Record<string, unknown>; devDependencies?: Record<string, unknown> }),
+    githubJson<Tree>(`${base}/git/trees/${commit.sha}?recursive=1`, 3000000, previous ? { etag: previous.sourceEtags?.tree, value: { tree: previous.paths.map(path => ({ path, type: 'blob' })), truncated: previous.truncated } } : undefined),
+    githubJson<Readme>(`${base}/readme?ref=${commit.sha}`, 400000, previous ? { etag: previous.sourceEtags?.readme, value: { cachedText: previous.readme, path: previous.readmePath ?? undefined, sha: previous.readmeSha ?? undefined } } : undefined),
+    githubJson<Package>(`${base}/contents/package.json?ref=${commit.sha}`, 64000, previous ? { etag: previous.sourceEtags?.package, value: { name: previous.packageName, dependencies: previous.dependencies } } : undefined, 'application/vnd.github.raw+json'),
   ]);
   if (fresh) for (const result of results) {
     if (result.status === 'rejected' && !(result.reason instanceof GitHubError && [404, 413].includes(result.reason.status))) throw result.reason;
   }
-  const tree = results[0].status === 'fulfilled' ? results[0].value : null;
+  const tree = results[0].status === 'fulfilled' ? results[0].value.value : null;
   if (!tree) warnings.push('파일 구조를 읽지 못했습니다.');
   let readme: string | null = null;
   let readmePath: string | null = null;
+  let readmeSha: string | null = null;
   if (results[1].status === 'fulfilled') {
-    const file = results[1].value;
-    if (file.content && file.encoding === 'base64' && (file.size ?? 0) <= 64000) {
+    const file = results[1].value.value;
+    readmeSha = file.sha ?? null;
+    if ('cachedText' in file) { readme = file.cachedText ?? null; readmePath = file.path ?? null; }
+    else if (file.content && file.encoding === 'base64' && (file.size ?? 0) <= 256000) {
       try { readme = new TextDecoder().decode(Uint8Array.from(atob(file.content.replace(/\s/g, '')), c => c.charCodeAt(0))); readmePath = file.path ?? 'README.md'; }
       catch { warnings.push('README 텍스트를 해석하지 못했습니다.'); }
-    } else warnings.push('README가 없거나 64KB 읽기 제한을 초과했습니다.');
+    } else warnings.push('README가 없거나 256KB 읽기 제한을 초과했습니다.');
   } else warnings.push('README를 읽지 못했습니다.');
-  const pkg = results[2].status === 'fulfilled' ? results[2].value : null;
+  const pkg = results[2].status === 'fulfilled' ? results[2].value.value : null;
   const dependencies = Object.fromEntries(Object.entries({ ...pkg?.dependencies, ...pkg?.devDependencies }).filter((entry): entry is [string, string] => typeof entry[1] === 'string').slice(0, 150));
   if (!pkg) warnings.push('루트 package.json을 읽지 못했습니다. 다른 언어 또는 하위 패키지의 의존성은 분석하지 않았습니다.');
   // Keep root and shallow source paths visible even in documentation-heavy repos.
   const paths = (tree?.tree ?? []).map(entry => entry.path).filter(safePath).sort((a, b) => a.split('/').length - b.split('/').length || a.localeCompare(b)).slice(0, 500);
   const overview: RepositoryOverview = {
-    id: metadata.full_name, description: metadata.description ?? '', language: metadata.language,
-    stars: metadata.stargazers_count, license: metadata.license?.spdx_id ?? null, sha: commit.sha,
-    fetchedAt: new Date().toISOString(), readme, readmePath, paths,
+    ...current, readme, readmePath, readmeSha, paths,
     truncated: Boolean(tree?.truncated || (tree?.tree.length ?? 0) > 500), dependencies,
     packageName: typeof pkg?.name === 'string' ? pkg.name : null, warnings,
+    sourceEtags: { tree: results[0].status === 'fulfilled' ? results[0].value.etag : undefined, readme: results[1].status === 'fulfilled' ? results[1].value.etag : undefined, package: results[2].status === 'fulfilled' ? results[2].value.etag : undefined },
   };
   if (overviewCache.size >= 40) overviewCache.delete(overviewCache.keys().next().value!);
   overviewCache.set(id.toLowerCase(), overview);

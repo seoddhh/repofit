@@ -91,8 +91,9 @@ export async function refreshRepositorySnapshot() {
     if (repository) {
       const snapshot = snapshotPeriods.map(period => manifest.periods[period]).find(period => period.repositories.some(repo => repo.id.toLowerCase() === repository))!;
       // Both collectors reject private repositories. Transient failures never publish partial data.
-      const overview = await inspectRepository(repository, true);
-      const evidence = await collectBriefEvidence(repository, snapshot, true);
+      const previous = active ? await db.select().from(items).where(eq(items.id, itemId(active.version, repository))).get() : undefined;
+      const overview = await inspectRepository(repository, true, previous?.overview);
+      const evidence = await collectBriefEvidence(repository, snapshot, true, { overview, previous: previous?.evidence, previousCommitSha: previous?.overview.sha });
       const createdAt = now();
       // Save first: a crash before cursor advancement safely retries the same item.
       const [entry] = await db.insert(items).select(db.select({

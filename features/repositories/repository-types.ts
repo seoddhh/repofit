@@ -35,6 +35,9 @@ export type RepositoryOverview = {
   dependencies: Record<string, string>;
   packageName: string | null;
   warnings: string[];
+  defaultBranch?: string;
+  readmeSha?: string | null;
+  sourceEtags?: { tree?: string; readme?: string; package?: string };
 };
 
 export function repositoryId(value: string): string | null {
