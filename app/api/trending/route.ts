@@ -1,18 +1,15 @@
-import { getTrending } from '@/features/repositories/github-server';
+import { readTrendingSnapshot } from '@/features/repositories/snapshot-store';
 
+export const dynamic = 'force-dynamic';
 export async function GET(request: Request) {
   const period = new URL(request.url).searchParams.get('since') ?? 'daily';
   if (period !== 'daily' && period !== 'weekly' && period !== 'monthly') {
     return Response.json({ error: '지원하지 않는 트렌딩 기간입니다.' }, { status: 400, headers: { 'Cache-Control': 'no-store' } });
   }
   try {
-    const snapshot = await getTrending(period);
-    const age = Math.max(0, Date.now() - Date.parse(snapshot.fetchedAt));
-    const remaining = Math.max(0, 300 - Math.ceil(age / 1000));
-    return Response.json(snapshot, { headers: { 'Cache-Control': snapshot.stale ? 'no-store' : `private, max-age=${remaining}` } });
-  }
-  catch (error) {
-    console.warn('RepoFit trending collection failed:', error instanceof Error ? error.message : 'unknown error');
-    return Response.json({ error: 'GitHub Trending을 불러오지 못했습니다. 잠시 후 다시 시도하거나 GitHub 원본을 확인해 주세요.' }, { status: 502, headers: { 'Cache-Control': 'no-store' } });
+    const snapshot = await readTrendingSnapshot(period);
+    return Response.json(snapshot, { headers: { 'Cache-Control': 'public, max-age=60, s-maxage=60', ETag: `"${snapshot.snapshotId}-${period}"` } });
+  } catch {
+    return Response.json({ error: '저장된 오픈소스 스냅샷을 준비하고 있습니다. 잠시 후 다시 확인해 주세요.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
   }
 }

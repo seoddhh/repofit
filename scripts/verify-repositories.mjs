@@ -10,6 +10,8 @@ try {
   writeFixture(temporary, 'package.json', '{"type":"commonjs"}');
   symlinkSync(resolve('node_modules'), join(temporary, 'node_modules'));
   const compile = createFixtureCompiler(temporary);
+  compile('lib/service-error.ts');
+  writeFixture(temporary, 'features/repositories/snapshot-store.js', 'exports.readRepositorySnapshot = async () => null;');
   for (const source of [
     'features/repositories/repository-types.ts',
     'features/repositories/trending-parser.ts',

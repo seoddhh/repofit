@@ -78,6 +78,7 @@ export type BriefResponse = {
   article: RepositoryBrief | null;
   evidence: BriefEvidence | null;
   stale: boolean;
+  snapshot?: { id: string; fetchedAt: string; nextRefreshAt: string; stale: boolean };
 };
 
 export function explanationPath(id: string) {

@@ -150,7 +150,7 @@ try {
   assert.ok(JSON.parse((await (await callDevice(a.token, 'search_usage_skills', { query: 'testing' })).json()).result.content[0].text).skills.length);
   // The public Sites endpoint routes ordinary authenticated users before the
   // editorial owner check. Isolate unrelated editorial dependencies here.
-  for (const [name, file] of [["brief-store", "features/editorial/brief-store.js"], ["brief-types", "features/editorial/brief-types.js"], ["repository-types", "features/repositories/repository-types.js"], ["catalog-types", "features/skills/catalog-types.js"]]) writeFixture(dir, file, name === 'brief-types' ? 'exports.publishBriefSchema = { shape: { content: { shape: {} } } };' : name === 'catalog-types' ? 'exports.categoryLabels = {};' : '');
+  for (const [name, file] of [["brief-store", "features/editorial/brief-store.js"], ["brief-types", "features/editorial/brief-types.js"], ["repository-types", "features/repositories/repository-types.js"], ["catalog-types", "features/skills/catalog-types.js"], ["snapshot-store", "features/repositories/snapshot-store.js"]]) writeFixture(dir, file, name === 'brief-types' ? 'exports.publishBriefSchema = { shape: { content: { shape: {} } } };' : name === 'catalog-types' ? 'exports.categoryLabels = {};' : '');
   writeFixture(dir, 'env.js', 'exports.env = { REPOFIT_EDITOR_EMAIL: "owner@example.test" };');
   compile('app/mcp/route.ts', 'routes/mcp.js', s => routeImports(s).replace('cloudflare:workers', '../env'));
   const publicMcp = require(join(dir, 'routes/mcp.js'));

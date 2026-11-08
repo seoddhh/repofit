@@ -71,10 +71,10 @@ assert.equal(lastUrl, '/api/trending?since=weekly');
 assert.equal(lastOptions.cache, 'reload');
 let routePeriod;
 let routeSnapshot = { ...snapshot(), fetchedAt: new Date(clock - 120000).toISOString() };
-const route = load('app/api/trending/route.ts', { Date: Clock, console: { warn() {} } }, { '@/features/repositories/github-server': { getTrending: async period => { routePeriod = period; return routeSnapshot; } } });
-assert.equal((await route.GET(new Request('https://repofit.local/api/trending'))).headers.get('cache-control'), 'private, max-age=180', 'Browser TTL must respect the original collection time');
+const route = load('app/api/trending/route.ts', { Date: Clock, console: { warn() {} } }, { '@/features/repositories/snapshot-store': { readTrendingSnapshot: async period => { routePeriod = period; return routeSnapshot; } } });
+assert.equal((await route.GET(new Request('https://repofit.local/api/trending'))).headers.get('cache-control'), 'public, max-age=60, s-maxage=60', 'Snapshot reads share a short public cache');
 routeSnapshot = { ...routeSnapshot, stale: true };
-assert.equal((await route.GET(new Request('https://repofit.local/api/trending'))).headers.get('cache-control'), 'no-store');
+assert.equal((await route.GET(new Request('https://repofit.local/api/trending'))).headers.get('cache-control'), 'public, max-age=60, s-maxage=60', 'Delayed collection still serves the saved snapshot');
 
 assert.equal(routePeriod, 'daily', 'Requests without a period keep the existing daily default');
 for (const period of ['daily', 'weekly', 'monthly']) {
@@ -113,4 +113,4 @@ const displayed = uiCopy(source);
 assert.equal(displayed.summary, '설계 및 검증');
 assert.equal(displayed.items[0], '문서 및 보고서');
 assert.equal(source.summary, '설계 \u00b7 검증', 'Presentation formatting leaves original sources unchanged');
-console.log('통과: 기간별 트렌딩 요청 공유와 캐시 분리, 5분 재사용 및 기간 검증, 수동 갱신과 실패 복구, HTTP 캐시 잔여 시간, 배경 스크롤 잠금과 위치 복원, 기존 문구 표시 정리');
+console.log('통과: 기간별 스냅샷 요청 공유와 캐시 분리, 5분 재사용 및 기간 검증, 저장본 수동 갱신과 실패 복구, 공개 HTTP 캐시, 배경 스크롤 잠금과 위치 복원, 기존 문구 표시 정리');
