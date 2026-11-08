@@ -16,6 +16,8 @@ export type TrendingSnapshot = {
   fetchedAt: string;
   sourceUrl: string;
   stale: boolean;
+  snapshotId?: string;
+  nextRefreshAt?: string;
 };
 
 export type RepositoryOverview = {
