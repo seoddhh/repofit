@@ -29,14 +29,20 @@ try {
   await assert.rejects(() => store.refreshRepositorySnapshot(), /offline/);
   assert.deepEqual((await store.readTrendingSnapshot()).repositories, baselineLists.daily.repositories, 'A failed first collection must not clear the existing list');
   upstream.fail(null);
+  clock = snapshotSlot(clock) + SNAPSHOT_INTERVAL_MS - 1;
   let step = await store.refreshRepositorySnapshot();
   assert.equal(step.completed, 1); assert.equal(step.total, 3); assert.equal(step.published, false);
   assert.equal(await store.readSnapshotManifest(), null, 'Incomplete generations stay private');
   assert.deepEqual((await store.readTrendingSnapshot()).repositories, baselineLists.daily.repositories, 'An incomplete first collection keeps the existing list');
-  await store.refreshRepositorySnapshot();
+  const collectingVersion = step.version;
+  clock += 2; // Reproduce the production run crossing midnight mid-collection.
+  const resumed = await store.refreshRepositorySnapshot();
+  assert.equal(resumed.version, collectingVersion, 'Crossing a scheduled boundary must preserve the in-progress generation');
+  assert.equal(resumed.completed, 2, 'Crossing midnight must advance rather than reset the cursor');
   step = await store.refreshRepositorySnapshot();
   assert.equal(step.published, true); assert.equal(step.remaining, 0);
   const first = await store.readSnapshotManifest();
+  clock = first.slot + 1000;
   assert.equal((await store.repositorySnapshotStatus()).source, 'scheduled_snapshot');
   const before = upstream.calls;
   assert.equal((await store.refreshRepositorySnapshot()).version, first.version);

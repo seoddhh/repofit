@@ -80,7 +80,10 @@ export async function refreshRepositorySnapshot() {
   let manifest = locked.data;
   const owned = and(eq(state.id, 'working'), eq(state.leaseToken, leaseToken));
   try {
-    if (manifest.slot !== slot || !manifest.periods.daily) {
+    // A run may start just before a scheduled boundary. Keep its version and
+    // cursor across that boundary; only abandon work more than one slot old.
+    const resumable = manifest.periods.daily && manifest.completed < manifest.repositories.length && slot - manifest.slot <= SNAPSHOT_INTERVAL_MS;
+    if ((manifest.slot !== slot && !resumable) || !manifest.periods.daily) {
       const snapshots = await Promise.all(snapshotPeriods.map(period => getTrending(period, true)));
       if (snapshots.some(snapshot => snapshot.stale || !snapshot.repositories.length)) throw new Error('최신 트렌딩 목록을 수집하지 못했습니다.');
       const repositories = [...new Set(snapshots.flatMap(snapshot => snapshot.repositories.map(repo => repo.id.toLowerCase())))];
