@@ -105,3 +105,7 @@ Sites Dispatch가 `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`�
 서버 캐시는 인스턴스 메모리에 있으므로 서버 재시작이나 다른 Worker 인스턴스 사이에서는 공유되지 않습니다. 여러 사용자 전체의 GitHub 수집을 5분에 한 번으로 제한하는 영속 캐시는 아닙니다. `node scripts/verify-ui-behavior.mjs`에서 요청 공유, 만료, 수동 새로고침과 HTTP 잔여 시간을 확인합니다.
 
 해설 큐는 세 기간 합집합에서 해설이 있는 저장소를 외부 요청 전에 제외합니다. 한 번에 최대 3개를 시도하고 한도 오류에는 중단합니다. 소유자 전용 `import_repository_brief`로 직접 읽은 공식 자료와 새 해설을 등록할 수 있습니다. `node scripts/verify-briefs.mjs`는 기존 글에 대한 REST 호출 0회, 실패 횟수 제한, 한도 중단, 소유자 인증, 출처 검증과 중복 등록 보존을 실제 SQLite로 검사합니다. [정책과 운영 반영 결과](docs/EDITORIAL_REFRESH_POLICY.md)를 참고하세요. DB 마이그레이션은 없습니다.
+
+## 2026-11-08 공개 자료 스냅샷
+
+공개 목록·상세와 해설 큐는 이제 D1의 저장된 스냅샷만 읽습니다. 위의 5분 인스턴스 메모리 캐시 설명은 이전 수집 구조이며 방문자 요청에는 적용하지 않습니다. 수집은 소유자 전용 MCP writer가 한국 시간 00시·08시·16시에 실행합니다. 임의 레포를 입력해도 방문자 경로에서 외부 조회하지 않습니다. 저장·원자적 공개·갱신·실패 처리와 검증은 [스냅샷 운영 계약](docs/REPOSITORY_SNAPSHOTS.md)을 따릅니다.

@@ -1,5 +1,7 @@
 # RepoFit
 
+공개 오픈소스 목록과 상세는 [영속 스냅샷](docs/REPOSITORY_SNAPSHOTS.md)으로 제공합니다. 한국 시간 00시·08시·16시에 수집하고 방문자 조회는 GitHub를 호출하지 않습니다. 임의의 개인 프로젝트 레포 수집은 이 갱신에 포함하지 않습니다.
+
 **내 레포에 딱 맞는 오픈소스, 적용 방법까지.**
 
 *Find the right open source for your repo.*
