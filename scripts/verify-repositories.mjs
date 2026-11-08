@@ -101,7 +101,7 @@ try {
     }
   } finally { Date.now = originalNow; }
   globalThis.fetch = async (url) => {
-    if (url.endsWith('/repos/owner/app')) return Response.json({ full_name: 'owner/app', description: '', language: 'TypeScript', stargazers_count: 0, license: null, default_branch: 'main' });
+    if (url.endsWith('/repos/owner/app')) return Response.json({ full_name: 'owner/app', private: false, description: '', language: 'TypeScript', stargazers_count: 0, license: null, default_branch: 'main' });
     if (url.includes('/git/ref/heads/')) return Response.json({ object: { sha: 'abc123' } });
     if (url.includes('/git/trees/')) return Response.json({ tree: [{path:'package.json'},{path:'.env.local'},{path:'credentials.json'},{path:'src/app.ts'}], truncated: false });
     if (url.includes('/readme?')) return Response.json({ content: Buffer.from('안녕하세요').toString('base64'), encoding: 'base64', path: 'README.md', size: 15 });
