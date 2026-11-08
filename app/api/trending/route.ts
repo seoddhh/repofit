@@ -8,7 +8,7 @@ export async function GET(request: Request) {
   }
   try {
     const snapshot = await readTrendingSnapshot(period);
-    return Response.json(snapshot, { headers: { 'Cache-Control': 'public, max-age=60, s-maxage=60', ETag: `"${snapshot.snapshotId}-${period}"` } });
+    return Response.json(snapshot, { headers: { 'Cache-Control': 'public, max-age=60, s-maxage=60', ETag: `"${snapshot.snapshotId ?? snapshot.fetchedAt}-${period}"` } });
   } catch {
     return Response.json({ error: '저장된 오픈소스 스냅샷을 준비하고 있습니다. 잠시 후 다시 확인해 주세요.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
   }

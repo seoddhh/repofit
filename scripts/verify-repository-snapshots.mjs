@@ -16,15 +16,28 @@ try {
     assert.equal(snapshotSlot(boundary - 1), boundary - SNAPSHOT_INTERVAL_MS);
   }
   const trending = f.load('app/api/trending/route.js');
-  assert.equal((await trending.GET(new Request('https://fixture.test/api/trending'))).status, 503);
-  assert.equal(upstream.calls, 0, 'An unseeded public page never bootstraps from GitHub');
+  const baselineLists = {};
+  for (const period of ['daily', 'weekly', 'monthly']) {
+    const response = await trending.GET(new Request(`https://fixture.test/api/trending?since=${period}`));
+    assert.equal(response.status, 200);
+    baselineLists[period] = await response.json();
+    assert.ok(baselineLists[period].repositories.length > 0, 'Existing lists remain visible before the first scheduled collection');
+  }
+  assert.equal((await store.repositorySnapshotStatus()).source, 'initial_baseline');
+  assert.equal(upstream.calls, 0, 'Initial public lists are saved data, never an on-demand GitHub collection');
+  upstream.fail('offline');
+  await assert.rejects(() => store.refreshRepositorySnapshot(), /offline/);
+  assert.deepEqual((await store.readTrendingSnapshot()).repositories, baselineLists.daily.repositories, 'A failed first collection must not clear the existing list');
+  upstream.fail(null);
   let step = await store.refreshRepositorySnapshot();
   assert.equal(step.completed, 1); assert.equal(step.total, 3); assert.equal(step.published, false);
   assert.equal(await store.readSnapshotManifest(), null, 'Incomplete generations stay private');
+  assert.deepEqual((await store.readTrendingSnapshot()).repositories, baselineLists.daily.repositories, 'An incomplete first collection keeps the existing list');
   await store.refreshRepositorySnapshot();
   step = await store.refreshRepositorySnapshot();
   assert.equal(step.published, true); assert.equal(step.remaining, 0);
   const first = await store.readSnapshotManifest();
+  assert.equal((await store.repositorySnapshotStatus()).source, 'scheduled_snapshot');
   const before = upstream.calls;
   assert.equal((await store.refreshRepositorySnapshot()).version, first.version);
   assert.equal(upstream.calls, before, 'A completed time slot is idempotent');
@@ -70,5 +83,5 @@ try {
   assert.notEqual(published.version, first.version);
   assert.equal((await store.readRepositorySnapshot('owner/first')).overview.stars, 999);
   assert.equal((await store.readRepositorySnapshot('owner/first', { version: first.version })).overview.stars, 100, 'An old browser can finish reading its immutable generation');
-  console.log('통과: 한국 시간 00/08/16시, 영속 스냅샷·원자적 공개·재개·동시 수집 잠금·중복 실행 생략·오류 시 이전 버전 유지·private 차단·방문자 조회 100회 GitHub 호출 0회·이전 버전 상세 일치');
+  console.log('통과: 첫 예약 전 기존 3기간 목록 유지·최초 수집 중 기존 목록 유지·완료 후에만 교체·한국 시간 00/08/16시·영속 스냅샷·동시 수집 잠금·오류 복구·private 차단·방문자 조회 100회 GitHub 호출 0회·이전 버전 상세 일치');
 } finally { f.close(); globalThis.fetch = originalFetch; Date.now = originalNow; }

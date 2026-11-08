@@ -6,6 +6,7 @@ import { collectBriefEvidence } from '../editorial/brief-evidence';
 import { getTrending, inspectRepository } from './github-server';
 import type { TrendingPeriod, TrendingSnapshot } from './repository-types';
 import { SNAPSHOT_INTERVAL_MS, snapshotPeriods, snapshotSlot, type RepositorySnapshotManifest } from './snapshot-types';
+import initialBaseline from '../../content/repository-snapshot-baseline.json';
 
 const now = () => new Date().toISOString();
 const itemId = (version: string, repository: string) => `${version}:${repository.toLowerCase()}`;
@@ -19,7 +20,12 @@ export async function readSnapshotManifest(version?: string) {
 
 export async function readTrendingSnapshot(period: TrendingPeriod = 'daily', version?: string): Promise<TrendingSnapshot> {
   const manifest = await readSnapshotManifest(version);
-  if (!manifest) throw new ServiceError('오픈소스 스냅샷을 준비하고 있습니다. 잠시 후 다시 확인해 주세요.', 503);
+  if (!manifest) {
+    if (version) throw new ServiceError('이전 스냅샷이 만료됐습니다. 목록을 새로고침해 주세요.', 404);
+    // Preserve the existing public lists until the first scheduled generation is complete.
+    // This checked-in baseline is captured from the previous production API, never fetched by visitors.
+    return { ...initialBaseline.periods[period], nextRefreshAt: initialBaseline.nextRefreshAt, stale: Date.now() > Date.parse(initialBaseline.nextRefreshAt) + 30 * 60_000 };
+  }
   return { ...manifest.periods[period], snapshotId: manifest.version, nextRefreshAt: manifest.nextRefreshAt, stale: delayed(manifest) };
 }
 
@@ -44,11 +50,11 @@ export async function repositorySnapshotStatus() {
     getDb().select({ data: state.data, leaseUntil: state.leaseUntil }).from(state).where(eq(state.id, 'working')).get(),
   ]);
   return {
-    ready: Boolean(active), version: active?.version ?? null, fetchedAt: active?.fetchedAt ?? null,
-    publishedAt: active?.publishedAt ?? null, nextRefreshAt: active?.nextRefreshAt ?? null,
-    stale: active ? delayed(active) : false,
-    periods: active ? snapshotPeriods.map(period => ({ period, repositories: active.periods[period].repositories.length })) : [],
-    totalRepositories: active?.repositories.length ?? 0,
+    ready: true, source: active ? 'scheduled_snapshot' : 'initial_baseline', version: active?.version ?? null, fetchedAt: active?.fetchedAt ?? initialBaseline.recordedAt,
+    publishedAt: active?.publishedAt ?? null, nextRefreshAt: active?.nextRefreshAt ?? initialBaseline.nextRefreshAt,
+    stale: active ? delayed(active) : Date.now() > Date.parse(initialBaseline.nextRefreshAt) + 30 * 60_000,
+    periods: snapshotPeriods.map(period => ({ period, repositories: (active?.periods ?? initialBaseline.periods)[period].repositories.length })),
+    totalRepositories: active?.repositories.length ?? new Set(snapshotPeriods.flatMap(period => initialBaseline.periods[period].repositories.map(repo => repo.id.toLowerCase()))).size,
     refresh: working ? { completed: working.data.completed, total: working.data.repositories.length, error: working.data.error ?? null, busy: working.leaseUntil > Date.now() } : null,
   };
 }

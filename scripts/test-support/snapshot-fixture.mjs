@@ -19,6 +19,7 @@ export function snapshotFixture() {
     'app/api/trending/route.ts', 'app/api/brief/route.ts', 'app/api/repository/route.ts',
   ]) compile(file);
   writeFixture(root, 'db/index.js', 'exports.getDb = () => globalThis.__snapshotDb;');
+  writeFixture(root, 'content/repository-snapshot-baseline.json', readFileSync('content/repository-snapshot-baseline.json', 'utf8'));
   const sqlite = new DatabaseSync(':memory:');
   for (const file of readdirSync('drizzle').filter(f => f.endsWith('.sql')).sort()) sqlite.exec(readFileSync(join('drizzle', file), 'utf8'));
   const d1 = {
