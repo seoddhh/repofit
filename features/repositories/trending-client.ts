@@ -1,6 +1,6 @@
 import type { TrendingPeriod, TrendingSnapshot } from './repository-types';
 
-const FRESH_MS = 5 * 60_000;
+const FRESH_MS = 60_000;
 const cache = new Map<TrendingPeriod, { snapshot: TrendingSnapshot; expiresAt: number }>();
 const requests = new Map<TrendingPeriod, Promise<TrendingSnapshot>>();
 
@@ -14,7 +14,7 @@ export function getTrendingSnapshot(period: TrendingPeriod = 'daily', force = fa
     const response = await fetch(`/api/trending?since=${period}`, { cache: force ? 'reload' : 'default' });
     const data = await response.json() as TrendingSnapshot & { error?: string };
     if (!response.ok) throw new Error(data.error ?? '트렌딩 목록을 불러오지 못했습니다.');
-    cache.set(period, { snapshot: data, expiresAt: data.stale ? Date.now() + 30_000 : Date.parse(data.fetchedAt) + FRESH_MS });
+    cache.set(period, { snapshot: data, expiresAt: Date.now() + (data.stale ? 30_000 : FRESH_MS) });
     return data;
   })().finally(() => { requests.delete(period); });
   requests.set(period, request);
