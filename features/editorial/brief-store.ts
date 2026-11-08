@@ -1,8 +1,10 @@
 import { eq, desc, inArray } from 'drizzle-orm';
 import { getDb } from '../../db';
 import { editorialSources, repositoryBriefs } from '../../db/schema';
-import { getTrending, GitHubError } from '../repositories/github-server';
-import { collectBriefEvidence, evidenceFingerprint, evidenceContentFingerprint } from './brief-evidence';
+import { readRepositorySnapshot, readTrendingSnapshot } from '../repositories/snapshot-store';
+import { ServiceError } from '@/lib/service-error';
+import { evidenceFingerprint, evidenceContentFingerprint } from './brief-evidence';
+import type { TrendingPeriod } from '../repositories/repository-types';
 import { editorialQueueSchema, importBriefSchema, publishBriefSchema, type BriefEvidence, type BriefResponse } from './brief-types';
 
 export async function listBriefs() {
@@ -10,9 +12,15 @@ export async function listBriefs() {
   return rows.map(({ id, content, evidence, generatedAt }) => ({ id, tagline: content.tagline, language: evidence.language, generatedAt, rank: evidence.trending?.rank ?? null }));
 }
 
-export async function readBrief(id: string): Promise<BriefResponse> {
+export async function readBrief(id: string, options: { version?: string; period?: TrendingPeriod } = {}): Promise<BriefResponse> {
   const db = getDb();
+  const saved = await readRepositorySnapshot(id, options);
+  if (options.version && !saved) throw new ServiceError('이전 스냅샷이 만료됐습니다. 목록을 새로고침해 주세요.', 404);
   const article = await db.select().from(repositoryBriefs).where(eq(repositoryBriefs.id, id.toLowerCase())).get();
+  if (saved) {
+    const stale = Boolean(article && await evidenceContentFingerprint(article.evidence) !== await evidenceContentFingerprint(saved.evidence));
+    return { article: article ?? null, evidence: saved.evidence, stale, snapshot: saved.snapshot };
+  }
   if (article) {
     // An introductory guide does not expire overnight. Flag only a known source change.
     const checked = await db.select().from(editorialSources).where(eq(editorialSources.id, id.toLowerCase())).get();
@@ -33,7 +41,7 @@ export async function collectEditorialQueue(input: unknown = {}) {
   const refreshAfter = parsed.refreshAfter ?? new Date(koreanDayStart).toISOString();
   if (Date.parse(refreshAfter) > Date.now()) throw new Error('갱신 기준 시각은 현재보다 미래일 수 없습니다.');
   const periods = ['daily', 'weekly', 'monthly'] as const;
-  const snapshots = await Promise.all(periods.map(period => getTrending(period)));
+  const snapshots = await Promise.all(periods.map(period => readTrendingSnapshot(period)));
   if (snapshots.some(snapshot => snapshot.stale)) throw new Error('최신 트렌딩을 수집하지 못했습니다. 이전 해설을 유지합니다.');
   // Prefer daily evidence for overlaps, then weekly, then monthly; write one brief per repository.
   const targets = new Map<string, { id: string; snapshot: typeof snapshots[number] }>();
@@ -54,13 +62,14 @@ export async function collectEditorialQueue(input: unknown = {}) {
   for (const repo of missing.slice(0, 3)) {
     try {
       const cached = await db.select().from(editorialSources).where(eq(editorialSources.id, repo.id.toLowerCase())).get();
-      const evidence = cached && Date.now() - Date.parse(cached.fetchedAt) < 3600000 ? cached.evidence : await collectBriefEvidence(repo.id, repo.snapshot);
+      const evidence = (await readRepositorySnapshot(repo.id))?.evidence;
+      if (!evidence) throw new Error('저장된 스냅샷 자료가 없습니다. 스냅샷 갱신을 먼저 완료하세요.');
       const fingerprint = await evidenceFingerprint(evidence);
       if (!cached || evidence !== cached.evidence || cached.fingerprint !== fingerprint) await db.insert(editorialSources).values({ id: repo.id.toLowerCase(), evidence, fingerprint, fetchedAt: evidence.fetchedAt }).onConflictDoUpdate({ target: editorialSources.id, set: { evidence, fingerprint, fetchedAt: evidence.fetchedAt } });
       queue.push({ repository: evidence.id, fingerprint, evidence });
     } catch (error) {
       failures.push({ repository: repo.id, error: error instanceof Error ? error.message : '자료 수집 실패' });
-      if (error instanceof GitHubError && error.status === 429) break;
+      break;
     }
   }
   return { instructions: '오늘 및 이번 주 및 이번 달 목록을 합쳐 저장소 이름의 대소문자를 구분하지 않고 중복을 제거했습니다. 기존 해설은 다시 수집하거나 작성하지 마세요. 코드 및 README 및 릴리스 변경만으로 기존 소개를 자동 재작성하지 않습니다. queue에 반환된 해설이 없는 저장소만 작성하세요. 빈 큐이고 dueRepositories가 0이면 추가 조사 없이 종료하세요. failures가 있으면 반복하지 말고 실패 원인을 보고하세요. refreshAfter는 호환용이며 재작성을 강제하지 않습니다. ' + editorialInstructions, queue, failures, fetchedAt: snapshots.map(snapshot => snapshot.fetchedAt).sort()[0], refreshAfter, changeDetection: 'missing-only-v1', periods: snapshots.map((snapshot, index) => ({ period: periods[index], totalRepositories: snapshot.repositories.length, sourceUrl: snapshot.sourceUrl, fetchedAt: snapshot.fetchedAt })), totalRepositories: targets.size, dueRepositories: missing.length, freshRepositories: unchangedRepositories, unchangedRepositories };
@@ -74,7 +83,7 @@ export async function importBrief(input: unknown) {
   if (existing) return { repository: id, generatedAt: existing.generatedAt, url: `/explore/${id}`, unchanged: true };
   const age = Date.now() - Date.parse(parsed.source.fetchedAt);
   if (age < -300000 || age > 86400000) throw new Error('최근 하루 안에 직접 확인한 자료가 필요합니다.');
-  const snapshot = await getTrending(parsed.source.period);
+  const snapshot = await readTrendingSnapshot(parsed.source.period);
   if (snapshot.stale) throw new Error('최신 트렌딩을 확인하지 못했습니다.');
   const trending = snapshot.repositories.find(repo => repo.id.toLowerCase() === id) ?? null;
   const { description, language, stars, license, readme, readmeUrl, fetchedAt, warnings } = parsed.source;

@@ -3,6 +3,25 @@ import type { UsageAnalysis, UsageCoverage, UsageReport, UsageCandidate } from '
 import type { BriefContent, BriefEvidence } from '../features/editorial/brief-types';
 import type { LocalInventory } from '../features/local-agent/local-agent-types';
 import type { ActivitySummary, CoachBundle, CoachNarrative, CoachReport } from '../features/coach/coach-types';
+import type { RepositorySnapshotManifest } from '../features/repositories/snapshot-types';
+import type { RepositoryOverview } from '../features/repositories/repository-types';
+
+export const repositorySnapshotState = sqliteTable('repository_snapshot_state', {
+  id: text('id').primaryKey(),
+  data: text('data', { mode: 'json' }).$type<RepositorySnapshotManifest>().notNull(),
+  updatedAt: text('updated_at').notNull(),
+  leaseToken: text('lease_token'),
+  leaseUntil: integer('lease_until').notNull().default(0),
+}, table => [index('repository_snapshot_state_updated').on(table.updatedAt)]);
+
+export const repositorySnapshotItems = sqliteTable('repository_snapshot_items', {
+  id: text('id').primaryKey(),
+  version: text('version').notNull(),
+  repository: text('repository').notNull(),
+  evidence: text('evidence', { mode: 'json' }).$type<BriefEvidence>().notNull(),
+  overview: text('overview', { mode: 'json' }).$type<RepositoryOverview>().notNull(),
+  createdAt: text('created_at').notNull(),
+}, table => [index('repository_snapshot_items_created').on(table.createdAt)]);
 
 export const skillCatalogState = sqliteTable('skill_catalog_state', {
   id: text('id').primaryKey(), data: text('data', { mode: 'json' }).$type<unknown>().notNull(), updatedAt: text('updated_at').notNull(),

@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, Check, CircleAlert, Clock3, FileText, Lightbulb, RefreshCw, ShieldCheck, Star, TrendingUp } from 'lucide-react';
-import { compactNumber } from '@/features/repositories/repository-types';
+import { compactNumber, type TrendingPeriod } from '@/features/repositories/repository-types';
 import { explanationPath, type BriefResponse } from '@/features/editorial/brief-types';
 import { GithubIcon } from '../../components/github-icon';
 import { uiCopy, uiText } from '@/lib/ui-copy';
@@ -12,7 +12,7 @@ function checkedAt(value: string) {
   return new Date(value).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-export function RepositoryExplanation({ repository, embedded = false }: { repository: string; embedded?: boolean }) {
+export function RepositoryExplanation({ repository, embedded = false, period, snapshotId }: { repository: string; embedded?: boolean; period?: TrendingPeriod; snapshotId?: string }) {
   const [data, setData] = useState<BriefResponse | null>(null);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
@@ -24,13 +24,14 @@ export function RepositoryExplanation({ repository, embedded = false }: { reposi
   }, []);
   useEffect(() => {
     const controller = new AbortController();
-    fetch(`/api/brief?repository=${encodeURIComponent(repository)}`, { signal: controller.signal }).then(async response => {
+    const query = new URLSearchParams({ repository, ...(period ? { since: period } : {}), ...(snapshotId ? { snapshot: snapshotId } : {}) });
+    fetch(`/api/brief?${query}`, { signal: controller.signal }).then(async response => {
       const body = await response.json() as BriefResponse & { error?: string };
       if (!response.ok) throw new Error(body.error || '해설을 불러오지 못했습니다.');
       if (!controller.signal.aborted) { setData(body); setError(''); }
     }).catch(error => { if (!controller.signal.aborted) setError(error.message); });
     return () => controller.abort();
-  }, [repository, attempt]);
+  }, [repository, attempt, period, snapshotId]);
   const evidence = data?.evidence;
   const trendingPeriodLabel = { daily: '오늘', weekly: '이번 주', monthly: '이번 달' }[evidence?.trendingPeriod ?? 'daily'];
   const article = data?.article ? { ...data.article, content: uiCopy(data.article.content) } : null;
@@ -48,7 +49,7 @@ export function RepositoryExplanation({ repository, embedded = false }: { reposi
         <div className="explanation-metadata"><span><Star size={14}/>{compactNumber(evidence.stars)} stars</span>{evidence.language && <span>{evidence.language}</span>}<span>{evidence.license ?? '라이선스 미확인'}</span></div>
         <div className="explanation-actions"><a href={`https://github.com/${evidence.id}`} target="_blank" rel="noreferrer" className="secondary-button"><GithubIcon size={16}/> GitHub 원본 <ArrowUpRight size={14}/></a><Link href={`/project?mode=agent&candidate=${encodeURIComponent(evidence.id)}`} className="primary-button">내 프로젝트에 도입 검토 <ArrowRight size={15}/></Link></div>
       </header>
-      <div className="explanation-update"><Clock3 size={14}/><span>{article ? `${checkedAt(article.generatedAt)} KST 해설 갱신` : `${checkedAt(evidence.fetchedAt)} KST 자료 확인`}</span><span className="explanation-update-label">{article ? 'AI가 공식 자료를 읽고 정리한 해설' : '공식 자료'}</span></div>
+      <div className="explanation-update"><Clock3 size={14}/><span>{article ? `${checkedAt(article.generatedAt)} KST 해설 갱신` : `${checkedAt(evidence.fetchedAt)} KST 자료 확인`}</span>{data.snapshot && <span>{checkedAt(data.snapshot.fetchedAt)} KST 스냅샷 기준</span>}<span className="explanation-update-label">{article ? 'AI가 공식 자료를 읽고 정리한 해설' : '공식 자료'}</span></div>
       {data.stale && <p className="explanation-notice"><CircleAlert size={15}/> 저장된 자료와 해설의 근거에 차이가 있습니다. 확인 시점과 최신 원문을 함께 살펴봐 주세요.</p>}
       {!article && <div className="explanation-pending"><BookOpen size={20}/><div><h2>쉬운 한국어 해설을 준비하고 있어요.</h2><p>아직 해설이 없는 레포는 저장된 공식 자료를 먼저 보여드립니다.</p></div></div>}
       <div className="explanation-section-tabs" role="tablist" aria-label="오픈소스 해설 내용">{[{ id: 'overview', label: '어떤 도구인가요?' }, { id: 'trending', label: '왜 주목받나요?' }, { id: 'sources', label: '출처와 시작하기' }].map((item, index, items) => <button key={item.id} id={`tab-${item.id}`} type="button" role="tab" aria-selected={section === item.id} aria-controls={`panel-${item.id}`} tabIndex={section === item.id ? 0 : -1} onClick={() => setSection(item.id)} onKeyDown={event => {
@@ -64,12 +65,12 @@ export function RepositoryExplanation({ repository, embedded = false }: { reposi
       </section>
       <section id="panel-trending" role="tabpanel" aria-labelledby="tab-trending" hidden={section !== 'trending'} tabIndex={0} className="explanation-panel">
         <div className="explanation-section"><h2><TrendingUp size={20}/>관심이 모이고 있다는 신호</h2>{evidence.trending ? <div className="explanation-trend-stats"><div><span>{trendingPeriodLabel} 전체 언어 트렌딩 순위</span><strong>#{evidence.trending.rank}</strong></div><div><span>{trendingPeriodLabel} 받은 스타</span><strong>{evidence.trending.today === null ? '미확인' : `+${evidence.trending.today.toLocaleString()}`}</strong></div><p>{evidence.trendingFetchedAt && `${checkedAt(evidence.trendingFetchedAt)} KST 수집`}{evidence.trendingStale ? ', 이전 수집 결과' : ''}</p></div> : <p>자료 수집 시점의 트렌딩 목록에는 없습니다.</p>}<p className="explanation-caveat">순위와 스타 증가는 관심의 신호입니다. 인기의 구체적인 원인이나 내 프로젝트와의 적합성을 입증하지는 않습니다.</p></div>
-        <div className="explanation-section"><h2>어떤 점이 주목받을 수 있나요?</h2>{article ? <div className="explanation-reasons">{article.content.trendReasons.map((reason, index) => <div key={index}><span className={`explanation-reason-kind ${reason.kind}`}>{reason.kind === 'fact' ? '확인한 사실' : '근거를 바탕으로 한 추정'}</span><p>{reason.text}</p><div>{reason.sourceUrls.map((url, n) => <a key={url} href={url} target="_blank" rel="noreferrer">{uiText(evidence.sources.find(s => s.url === url)?.title ?? `근거 ${n + 1}`)} <ArrowUpRight size={12}/></a>)}</div></div>)}</div> : <p>트렌딩에 오른 구체적인 원인은 아직 확인되지 않았습니다. 스타 수치만으로 원인을 추정해 표시하지 않습니다.</p>}</div>
+        <div className="explanation-section"><h2>어떤 점이 주목받을 수 있나요?</h2>{article ? <div className="explanation-reasons">{article.content.trendReasons.map((reason, index) => <div key={index}><span className={`explanation-reason-kind ${reason.kind}`}>{reason.kind === 'fact' ? '확인한 사실' : '근거를 바탕으로 한 추정'}</span><p>{reason.text}</p><div>{reason.sourceUrls.map((url, n) => <a key={url} href={url} target="_blank" rel="noreferrer">{uiText((article?.evidence.sources ?? evidence.sources).find(s => s.url === url)?.title ?? `근거 ${n + 1}`)} <ArrowUpRight size={12}/></a>)}</div></div>)}</div> : <p>트렌딩에 오른 구체적인 원인은 아직 확인되지 않았습니다. 스타 수치만으로 원인을 추정해 표시하지 않습니다.</p>}</div>
         {evidence.release && <div className="explanation-release"><span>확인한 공식 릴리스</span><a href={evidence.release.url} target="_blank" rel="noreferrer">{uiText(evidence.release.name)} <ArrowUpRight size={14}/></a><p>{checkedAt(evidence.release.publishedAt)} KST 발표. 발표와 트렌딩 사이의 인과관계는 별도 확인이 필요합니다.</p></div>}
       </section>
       <section id="panel-sources" role="tabpanel" aria-labelledby="tab-sources" hidden={section !== 'sources'} tabIndex={0} className="explanation-panel">
         <div className="explanation-section"><h2>시작하는 방법</h2><p>{article?.content.gettingStarted || '공식 README에서 설치 조건과 사용 예시를 먼저 확인하세요. 아직 설치 방법을 검토하지 않았습니다.'}</p></div>
-        <div className="explanation-section"><h2><FileText size={19}/>해설의 근거</h2><div className="explanation-sources">{evidence.sources.map(source => <a href={source.url} key={source.url} target="_blank" rel="noreferrer"><FileText size={18}/><span>{uiText(source.title)}<small>{new URL(source.url).hostname}</small></span><ArrowUpRight size={15}/></a>)}</div><p className="explanation-caveat">{checkedAt(evidence.fetchedAt)} KST 공식 자료 확인{evidence.readmeSha ? `, README ${evidence.readmeSha.slice(0, 7)}` : ''}. 실제 설치와 코드 실행은 검증하지 않았습니다.</p></div>
+        <div className="explanation-section"><h2><FileText size={19}/>해설의 근거</h2><div className="explanation-sources">{(article?.evidence.sources ?? evidence.sources).map(source => <a href={source.url} key={source.url} target="_blank" rel="noreferrer"><FileText size={18}/><span>{uiText(source.title)}<small>{new URL(source.url).hostname}</small></span><ArrowUpRight size={15}/></a>)}</div><p className="explanation-caveat">{checkedAt(evidence.fetchedAt)} KST 공식 자료 확인{evidence.readmeSha ? `, README ${evidence.readmeSha.slice(0, 7)}` : ''}. 실제 설치와 코드 실행은 검증하지 않았습니다.</p></div>
         {evidence.warnings.length > 0 && <div className="explanation-notice"><CircleAlert size={16}/><ul>{evidence.warnings.map(text => <li key={text}>{uiText(text)}</li>)}</ul></div>}
         {evidence.readme && <details className="explanation-readme"><summary>확인한 README 원문</summary><RepositoryContentPanel className="readme-scroll-panel" viewportClassName="readme-scroll-viewport" label="공식 README 원문"><pre>{evidence.readme}</pre></RepositoryContentPanel></details>}
       </section>

@@ -15,7 +15,7 @@ export async function boundedText(response: Response, limit: number): Promise<st
       const { done, value } = await reader.read();
       if (done) break;
       size += value.byteLength;
-      if (size > limit) { await reader.cancel(); throw new GitHubError('자료가 읽기 제한을 초과했습니다.'); }
+      if (size > limit) { await reader.cancel(); throw new GitHubError('자료가 읽기 제한을 초과했습니다.', 413); }
       chunks.push(value);
     }
   } finally { reader.releaseLock(); }
@@ -39,9 +39,9 @@ export async function github(path: string, accept = 'application/vnd.github+json
 
 const trendingCache = new Map<TrendingPeriod, TrendingSnapshot>();
 const trendingRequests = new Map<TrendingPeriod, Promise<TrendingSnapshot>>();
-export async function getTrending(period: TrendingPeriod = 'daily'): Promise<TrendingSnapshot> {
+export async function getTrending(period: TrendingPeriod = 'daily', fresh = false): Promise<TrendingSnapshot> {
   const cached = trendingCache.get(period);
-  if (cached && Date.now() - Date.parse(cached.fetchedAt) < 300000) return cached;
+  if (!fresh && cached && Date.now() - Date.parse(cached.fetchedAt) < 300000) return cached;
   const pending = trendingRequests.get(period);
   if (pending) return pending;
   const request = (async () => {
@@ -54,7 +54,7 @@ export async function getTrending(period: TrendingPeriod = 'daily'): Promise<Tre
       trendingCache.set(period, snapshot);
       return snapshot;
     } catch (error) {
-      if (cached) return { ...cached, stale: true };
+      if (!fresh && cached) return { ...cached, stale: true };
       throw error;
     } finally { trendingRequests.delete(period); }
   })();
@@ -62,16 +62,17 @@ export async function getTrending(period: TrendingPeriod = 'daily'): Promise<Tre
   return request;
 }
 
-type Metadata = { full_name: string; description: string | null; language: string | null; stargazers_count: number; license: { spdx_id: string } | null; default_branch: string };
+type Metadata = { full_name: string; private: boolean; description: string | null; language: string | null; stargazers_count: number; license: { spdx_id: string } | null; default_branch: string };
 type Tree = { tree: { path: string; type: string }[]; truncated: boolean };
 const overviewCache = new Map<string, RepositoryOverview>();
 const safePath = (path: string) => !/(^|\/)(\.env[^/]*|credentials[^/]*|secrets?[^/]*|[^/]*\.(pem|key))($|\/)/i.test(path);
 
-export async function inspectRepository(id: string): Promise<RepositoryOverview> {
+export async function inspectRepository(id: string, fresh = false): Promise<RepositoryOverview> {
   const cached = overviewCache.get(id.toLowerCase());
-  if (cached && Date.now() - Date.parse(cached.fetchedAt) < 300000) return cached;
+  if (!fresh && cached && Date.now() - Date.parse(cached.fetchedAt) < 300000) return cached;
   const base = `/repos/${id.split('/').map(encodeURIComponent).join('/')}`;
   const metadata: Metadata = JSON.parse(await boundedText(await github(base), 100000));
+  if (metadata.private !== false) throw new GitHubError('공개 저장소만 수집할 수 있습니다.', 403);
   const ref: { object: { sha: string } } = JSON.parse(await boundedText(await github(`${base}/git/ref/heads/${encodeURIComponent(metadata.default_branch)}`), 100000));
   const commit = { sha: ref.object.sha };
   const warnings: string[] = [];
@@ -80,6 +81,9 @@ export async function inspectRepository(id: string): Promise<RepositoryOverview>
     github(`${base}/readme?ref=${commit.sha}`).then(response => boundedText(response, 120000)).then(text => JSON.parse(text) as { content?: string; encoding?: string; path?: string; size?: number }),
     github(`${base}/contents/package.json?ref=${commit.sha}`, 'application/vnd.github.raw+json').then(response => boundedText(response, 64000)).then(text => JSON.parse(text) as { name?: unknown; dependencies?: Record<string, unknown>; devDependencies?: Record<string, unknown> }),
   ]);
+  if (fresh) for (const result of results) {
+    if (result.status === 'rejected' && !(result.reason instanceof GitHubError && [404, 413].includes(result.reason.status))) throw result.reason;
+  }
   const tree = results[0].status === 'fulfilled' ? results[0].value : null;
   if (!tree) warnings.push('파일 구조를 읽지 못했습니다.');
   let readme: string | null = null;

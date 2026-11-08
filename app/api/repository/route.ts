@@ -1,4 +1,5 @@
-import { GitHubError, inspectRepository } from '@/features/repositories/github-server';
+import { ServiceError } from '@/lib/service-error';
+import { readRepositorySnapshot } from '@/features/repositories/snapshot-store';
 import { repositoryId } from '@/features/repositories/repository-types';
 
 export async function POST(request: Request) {
@@ -9,9 +10,11 @@ export async function POST(request: Request) {
     const input = JSON.parse(body);
     const id = input && typeof input.repository === 'string' && repositoryId(input.repository);
     if (!id) return Response.json({ error: 'github.com/owner/repository 형식의 공개 레포 주소를 입력해 주세요.' }, { status: 400 });
-    return Response.json(await inspectRepository(id), { headers: { 'Cache-Control': 'private, no-store' } });
+    const saved = await readRepositorySnapshot(id);
+    if (!saved) return Response.json({ error: '저장된 공개 오픈소스 스냅샷에 없는 레포입니다. 트렌딩 목록에서 선택해 주세요.' }, { status: 404, headers: { 'Cache-Control': 'no-store' } });
+    return Response.json(saved.overview, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) {
     if (error instanceof SyntaxError) return Response.json({ error: '올바른 JSON 요청을 보내 주세요.' }, { status: 400 });
-    return Response.json({ error: error instanceof GitHubError ? error.message : '자료를 불러오지 못했습니다. 주소를 확인하고 다시 시도해 주세요.' }, { status: error instanceof GitHubError ? error.status : 502 });
+    return Response.json({ error: error instanceof ServiceError ? error.message : '저장된 자료를 불러오지 못했습니다. 잠시 후 다시 확인해 주세요.' }, { status: error instanceof ServiceError ? error.status : 503 });
   }
 }

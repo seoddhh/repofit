@@ -2,12 +2,13 @@ import { github, boundedText, GitHubError } from '../repositories/github-server'
 import type { TrendingSnapshot } from '../repositories/repository-types';
 import type { BriefEvidence } from './brief-types';
 
-export async function collectBriefEvidence(id: string, snapshot: TrendingSnapshot | null): Promise<BriefEvidence> {
+export async function collectBriefEvidence(id: string, snapshot: TrendingSnapshot | null, strict = false): Promise<BriefEvidence> {
   const base = `/repos/${id.split('/').map(encodeURIComponent).join('/')}`;
   const metadata = JSON.parse(await boundedText(await github(base), 80000)) as {
-    full_name: string; description: string | null; language: string | null;
+    full_name: string; private: boolean; description: string | null; language: string | null;
     stargazers_count: number; license: { spdx_id: string } | null;
   };
+  if (metadata.private !== false) throw new GitHubError('공개 저장소만 수집할 수 있습니다.', 403);
   const warnings: string[] = [];
   const [readmeResult, releaseResult] = await Promise.allSettled([
     github(`${base}/readme`).then(r => boundedText(r, 400000)).then(text => JSON.parse(text) as { content?: string; encoding?: string; size?: number; sha?: string; html_url?: string }),
@@ -15,6 +16,7 @@ export async function collectBriefEvidence(id: string, snapshot: TrendingSnapsho
   ]);
   for (const result of [readmeResult, releaseResult]) {
     if (result.status === 'rejected' && result.reason instanceof GitHubError && result.reason.status === 429) throw result.reason;
+    if (strict && result.status === 'rejected' && !(result.reason instanceof GitHubError && [404, 413].includes(result.reason.status))) throw result.reason;
   }
   const repoUrl = `https://github.com/${metadata.full_name}`;
   const sources = [{ title: '공식 GitHub 저장소', url: repoUrl }];
