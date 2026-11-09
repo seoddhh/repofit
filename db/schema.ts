@@ -23,6 +23,14 @@ export const repositorySnapshotItems = sqliteTable('repository_snapshot_items', 
   createdAt: text('created_at').notNull(),
 }, table => [index('repository_snapshot_items_created').on(table.createdAt)]);
 
+// Collected once per repository; independent of short-lived snapshot generations.
+export const repositoryMaterials = sqliteTable('repository_materials', {
+  id: text('id').primaryKey(),
+  evidence: text('evidence', { mode: 'json' }).$type<BriefEvidence>().notNull(),
+  overview: text('overview', { mode: 'json' }).$type<RepositoryOverview>().notNull(),
+  collectedAt: text('collected_at').notNull(),
+});
+
 export const skillCatalogState = sqliteTable('skill_catalog_state', {
   id: text('id').primaryKey(), data: text('data', { mode: 'json' }).$type<unknown>().notNull(), updatedAt: text('updated_at').notNull(),
 });

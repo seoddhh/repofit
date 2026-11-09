@@ -1,7 +1,7 @@
 import { eq, desc, inArray } from 'drizzle-orm';
 import { getDb } from '../../db';
 import { editorialSources, repositoryBriefs } from '../../db/schema';
-import { readRepositorySnapshot, readTrendingSnapshot } from '../repositories/snapshot-store';
+import { readEditorialSnapshotManifest, readRepositorySnapshot, readSnapshotEvidence, readTrendingSnapshot } from '../repositories/snapshot-store';
 import { ServiceError } from '@/lib/service-error';
 import { evidenceFingerprint, evidenceContentFingerprint } from './brief-evidence';
 import type { TrendingPeriod } from '../repositories/repository-types';
@@ -41,8 +41,9 @@ export async function collectEditorialQueue(input: unknown = {}) {
   const refreshAfter = parsed.refreshAfter ?? new Date(koreanDayStart).toISOString();
   if (Date.parse(refreshAfter) > Date.now()) throw new Error('갱신 기준 시각은 현재보다 미래일 수 없습니다.');
   const periods = ['daily', 'weekly', 'monthly'] as const;
-  const snapshots = await Promise.all(periods.map(period => readTrendingSnapshot(period)));
-  if (snapshots.some(snapshot => snapshot.stale)) throw new Error('최신 트렌딩을 수집하지 못했습니다. 이전 해설을 유지합니다.');
+  const manifest = await readEditorialSnapshotManifest();
+  if (!manifest) throw new Error('스냅샷 자료 수집을 먼저 완료하세요.');
+  const snapshots = periods.map(period => manifest.periods[period]);
   // Prefer daily evidence for overlaps, then weekly, then monthly; write one brief per repository.
   const targets = new Map<string, { id: string; snapshot: typeof snapshots[number] }>();
   for (const snapshot of snapshots) {
@@ -62,17 +63,18 @@ export async function collectEditorialQueue(input: unknown = {}) {
   for (const repo of missing.slice(0, 3)) {
     try {
       const cached = await db.select().from(editorialSources).where(eq(editorialSources.id, repo.id.toLowerCase())).get();
-      const evidence = (await readRepositorySnapshot(repo.id))?.evidence;
+      const evidence = await readSnapshotEvidence(manifest.version, repo.id);
       if (!evidence) throw new Error('저장된 스냅샷 자료가 없습니다. 스냅샷 갱신을 먼저 완료하세요.');
       const fingerprint = await evidenceFingerprint(evidence);
-      if (!cached || evidence !== cached.evidence || cached.fingerprint !== fingerprint) await db.insert(editorialSources).values({ id: repo.id.toLowerCase(), evidence, fingerprint, fetchedAt: evidence.fetchedAt }).onConflictDoUpdate({ target: editorialSources.id, set: { evidence, fingerprint, fetchedAt: evidence.fetchedAt } });
+      const queuedAt = new Date(Date.now()).toISOString();
+      if (!cached || cached.fingerprint !== fingerprint || Date.now() - Date.parse(cached.fetchedAt) > 3600000) await db.insert(editorialSources).values({ id: repo.id.toLowerCase(), evidence, fingerprint, fetchedAt: queuedAt }).onConflictDoUpdate({ target: editorialSources.id, set: { evidence, fingerprint, fetchedAt: queuedAt } });
       queue.push({ repository: evidence.id, fingerprint, evidence });
     } catch (error) {
       failures.push({ repository: repo.id, error: error instanceof Error ? error.message : '자료 수집 실패' });
       break;
     }
   }
-  return { instructions: '오늘 및 이번 주 및 이번 달 목록을 합쳐 저장소 이름의 대소문자를 구분하지 않고 중복을 제거했습니다. 기존 해설은 다시 수집하거나 작성하지 마세요. 코드 및 README 및 릴리스 변경만으로 기존 소개를 자동 재작성하지 않습니다. queue에 반환된 해설이 없는 저장소만 작성하세요. 빈 큐이고 dueRepositories가 0이면 추가 조사 없이 종료하세요. failures가 있으면 반복하지 말고 실패 원인을 보고하세요. refreshAfter는 호환용이며 재작성을 강제하지 않습니다. ' + editorialInstructions, queue, failures, fetchedAt: snapshots.map(snapshot => snapshot.fetchedAt).sort()[0], refreshAfter, changeDetection: 'missing-only-v1', periods: snapshots.map((snapshot, index) => ({ period: periods[index], totalRepositories: snapshot.repositories.length, sourceUrl: snapshot.sourceUrl, fetchedAt: snapshot.fetchedAt })), totalRepositories: targets.size, dueRepositories: missing.length, freshRepositories: unchangedRepositories, unchangedRepositories };
+  return { instructions: '수집을 마친 스냅샷의 세 기간 목록을 합쳐 중복을 제거했습니다. 기존 자료와 해설은 재수집하거나 재작성하지 마세요. queue에 반환된 해설이 없는 저장소만 작성하세요. 빈 큐이고 dueRepositories가 0이면 refresh_repository_snapshot을 호출해 스냅샷 전체를 공개하고 상태를 확인하세요. failures가 있으면 반복하지 말고 실패 원인을 보고하세요. refreshAfter는 호환용이며 재작성을 강제하지 않습니다. ' + editorialInstructions, version: manifest.version, queue, failures, fetchedAt: snapshots.map(snapshot => snapshot.fetchedAt).sort()[0], refreshAfter, changeDetection: 'missing-only-v1', periods: snapshots.map((snapshot, index) => ({ period: periods[index], totalRepositories: snapshot.repositories.length, sourceUrl: snapshot.sourceUrl, fetchedAt: snapshot.fetchedAt })), totalRepositories: targets.size, dueRepositories: missing.length, freshRepositories: unchangedRepositories, unchangedRepositories };
 }
 
 export async function importBrief(input: unknown) {
@@ -110,17 +112,16 @@ export async function publishBrief(input: unknown) {
   const parsed = publishBriefSchema.parse(input);
   const id = parsed.repository.toLowerCase();
   const db = getDb();
+  const existing = await db.select().from(repositoryBriefs).where(eq(repositoryBriefs.id, id)).get();
+  if (existing) return { repository: id, generatedAt: existing.generatedAt, url: `/explore/${id}`, unchanged: true };
   const source = await db.select().from(editorialSources).where(eq(editorialSources.id, id)).get();
   if (!source || source.fingerprint !== parsed.fingerprint) throw new Error('수집한 자료와 일치하지 않습니다. 자료를 다시 수집해 주세요.');
   if (Date.now() - Date.parse(source.fetchedAt) > 86400000) throw new Error('수집 자료가 하루 이상 지났습니다. 자료를 다시 수집해 주세요.');
   const allowedUrls = new Set(source.evidence.sources.map(s => s.url));
   if (parsed.content.trendReasons.some(r => r.sourceUrls.some(url => !allowedUrls.has(url)))) throw new Error('직접 수집한 출처만 인용할 수 있습니다.');
-  const existing = await db.select().from(repositoryBriefs).where(eq(repositoryBriefs.id, id)).get();
-  if (existing && await evidenceContentFingerprint(existing.evidence) === await evidenceContentFingerprint(source.evidence)) {
-    return { repository: id, generatedAt: existing.generatedAt, url: `/explore/${id}`, unchanged: true };
-  }
   const generatedAt = new Date().toISOString();
   const article = { id, fingerprint: source.fingerprint, evidence: source.evidence, content: parsed.content, generatedAt };
-  await db.insert(repositoryBriefs).values(article).onConflictDoUpdate({ target: repositoryBriefs.id, set: article });
-  return { repository: id, generatedAt, url: `/explore/${id}` };
+  const inserted = await db.insert(repositoryBriefs).values(article).onConflictDoNothing().returning({ id: repositoryBriefs.id });
+  const saved = await db.select().from(repositoryBriefs).where(eq(repositoryBriefs.id, id)).get();
+  return { repository: id, generatedAt: saved!.generatedAt, url: `/explore/${id}`, unchanged: inserted.length === 0 };
 }

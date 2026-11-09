@@ -29,6 +29,7 @@ try {
     await assert.rejects(() => store.publishBrief({ repository: item.repository, fingerprint: item.fingerprint, content: { ...rowContent, trendReasons: [{ ...content.trendReasons[0], sourceUrls: ['https://evil.test/fake'] }] } }));
     await store.publishBrief({ repository: item.repository, fingerprint: item.fingerprint, content: rowContent });
   }
+  assert.equal((await snapshots.refreshRepositorySnapshot()).published, true, 'Publish the generation only after all introductions exist');
   assert.equal((await store.collectEditorialQueue()).dueRepositories, 0);
   const saved = await store.readBrief('OWNER/FIRST');
   assert.equal(saved.article.content.summary, content.summary);
@@ -47,6 +48,9 @@ try {
   assert.equal(changed.article.evidence.stars, 100, 'The explanation retains its original evidence');
   assert.equal(changed.article.generatedAt, generatedAt); assert.equal(changed.stale, true);
   assert.equal((await store.collectEditorialQueue()).dueRepositories, 0, 'Source drift does not silently rewrite an existing introduction');
+  f.sqlite.prepare("UPDATE editorial_sources SET evidence = json_set(evidence, '$.description', 'Different source'), fingerprint = ? WHERE id = ?").run('c'.repeat(64), 'owner/first');
+  assert.equal((await store.publishBrief({ repository: 'owner/first', fingerprint: 'c'.repeat(64), content: { ...content, summary: '덮어쓰면 안 되는 새 본문이므로 기존 글을 그대로 유지합니다.' } })).unchanged, true);
+  assert.equal((await store.readBrief('owner/first')).article.content.summary, content.summary, 'An existing introduction is never overwritten, even with changed evidence');
   const importedInput = {
     repository: 'owner/manual',
     source: { description: 'Official manual', language: null, stars: 0, license: null,

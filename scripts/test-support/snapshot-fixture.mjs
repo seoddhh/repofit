@@ -77,3 +77,18 @@ export function mockSnapshotGitHub() {
     },
   };
 }
+
+export async function completeSnapshotEditorial(fixture) {
+  const store = fixture.load('features/editorial/brief-store.js');
+  for (;;) {
+    const result = await store.collectEditorialQueue();
+    if (result.failures.length) throw new Error(JSON.stringify(result.failures));
+    if (!result.dueRepositories) return;
+    for (const item of result.queue) await store.publishBrief({ repository: item.repository, fingerprint: item.fingerprint, content: {
+      tagline: '공식 자료를 근거로 정리한 테스트 해설입니다.', summary: '프로젝트의 공식 자료로 용도와 도입 조건을 설명합니다.',
+      useCases: ['새로운 도구의 용도를 비교하는 데 활용합니다.'], strengths: ['공식 문서에 사용 방법이 설명되어 있습니다.'],
+      limitations: ['실제 설치와 실행 환경의 호환성은 확인하지 않았습니다.'], gettingStarted: '공식 README의 시작 절차를 확인하세요.',
+      trendReasons: [{ kind: 'inference', text: '공식 자료만으로 인기의 원인은 확인되지 않았습니다.', sourceUrls: [item.evidence.sources[0].url] }],
+    } });
+  }
+}

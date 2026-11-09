@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { snapshotFixture, mockSnapshotGitHub } from './test-support/snapshot-fixture.mjs';
+import { snapshotFixture, mockSnapshotGitHub, completeSnapshotEditorial } from './test-support/snapshot-fixture.mjs';
 
 const originalFetch = globalThis.fetch, originalNow = Date.now;
 const f = snapshotFixture();
@@ -40,6 +40,12 @@ try {
   assert.equal(resumed.version, collectingVersion, 'Crossing a scheduled boundary must preserve the in-progress generation');
   assert.equal(resumed.completed, 2, 'Crossing midnight must advance rather than reset the cursor');
   step = await store.refreshRepositorySnapshot();
+  assert.equal(step.phase, 'editorial'); assert.equal(step.published, false); assert.equal(step.dueRepositories, 3);
+  assert.equal(await store.readSnapshotManifest(), null, 'Collected materials must wait for all new introductions');
+  assert.equal(await store.readSnapshotManifest(step.version), null, 'The unpublished generation is not accessible by its version');
+  assert.equal((await store.refreshRepositorySnapshot()).phase, 'editorial', 'Repeated collector calls cannot bypass missing introductions');
+  await completeSnapshotEditorial(f);
+  step = await store.refreshRepositorySnapshot();
   assert.equal(step.published, true); assert.equal(step.remaining, 0);
   const first = await store.readSnapshotManifest();
   clock = first.slot + 1000;
@@ -69,6 +75,7 @@ try {
   await assert.rejects(() => store.refreshRepositorySnapshot(), /offline/);
   assert.equal((await store.readSnapshotManifest()).version, first.version);
   upstream.fail('private');
+  upstream.lists.daily.push('owner/new');
   await assert.rejects(() => store.refreshRepositorySnapshot(), /공개 저장소/);
   assert.equal((await store.readSnapshotManifest()).version, first.version);
   upstream.fail('quota');
@@ -77,17 +84,20 @@ try {
   upstream.fail(null); upstream.setStars(999);
   let release, entered;
   const gate = new Promise(resolve => { entered = resolve; });
-  globalThis.fetch = async url => { if (url.endsWith('/repos/owner/first')) { entered(); await new Promise(resolve => { release = resolve; }); } return upstream.fetch(url); };
+  globalThis.fetch = async url => { if (url.endsWith('/repos/owner/new')) { entered(); await new Promise(resolve => { release = resolve; }); } return upstream.fetch(url); };
   const running = store.refreshRepositorySnapshot();
   await gate;
   assert.equal((await store.refreshRepositorySnapshot()).busy, true, 'A second collector cannot acquire the persistent lease');
   assert.equal((await store.readSnapshotManifest()).version, first.version);
   release(); globalThis.fetch = upstream.fetch; await running;
-  await store.refreshRepositorySnapshot();
+  let collected = await store.refreshRepositorySnapshot();
+  assert.equal(collected.phase, 'editorial');
+  assert.equal((await store.readSnapshotManifest()).version, first.version, 'A new list stays hidden until its new introduction exists');
+  await completeSnapshotEditorial(f);
   const published = await store.refreshRepositorySnapshot();
   assert.equal(published.published, true);
   assert.notEqual(published.version, first.version);
-  assert.equal((await store.readRepositorySnapshot('owner/first')).overview.stars, 999);
+  assert.equal((await store.readRepositorySnapshot('owner/first')).overview.stars, 100, 'Existing repository materials are reused without refetching');
   assert.equal((await store.readRepositorySnapshot('owner/first', { version: first.version })).overview.stars, 100, 'An old browser can finish reading its immutable generation');
   console.log('통과: 첫 예약 전 기존 3기간 목록 유지·최초 수집 중 기존 목록 유지·완료 후에만 교체·한국 시간 00/08/16시·영속 스냅샷·동시 수집 잠금·오류 복구·private 차단·방문자 조회 100회 GitHub 호출 0회·이전 버전 상세 일치');
 } finally { f.close(); globalThis.fetch = originalFetch; Date.now = originalNow; }

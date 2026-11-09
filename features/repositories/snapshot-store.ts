@@ -1,14 +1,15 @@
-import { and, eq, lt, lte, ne, sql } from 'drizzle-orm';
+import { and, eq, inArray, lt, lte, ne, sql } from 'drizzle-orm';
 import { getDb } from '../../db';
-import { repositorySnapshotState as state, repositorySnapshotItems as items } from '../../db/schema';
+import { repositorySnapshotState as state, repositorySnapshotItems as items, repositoryMaterials, repositoryBriefs, editorialSources } from '../../db/schema';
 import { ServiceError } from '@/lib/service-error';
 import { collectBriefEvidence } from '../editorial/brief-evidence';
 import { getTrending, inspectRepository } from './github-server';
-import type { TrendingPeriod, TrendingSnapshot } from './repository-types';
+import type { RepositoryOverview, TrendingPeriod, TrendingSnapshot } from './repository-types';
+import type { BriefEvidence } from '../editorial/brief-types';
 import { SNAPSHOT_INTERVAL_MS, snapshotPeriods, snapshotSlot, type RepositorySnapshotManifest } from './snapshot-types';
 import initialBaseline from '../../content/repository-snapshot-baseline.json';
 
-const now = () => new Date().toISOString();
+const now = () => new Date(Date.now()).toISOString();
 const itemId = (version: string, repository: string) => `${version}:${repository.toLowerCase()}`;
 const delayed = (manifest: RepositorySnapshotManifest) => Date.now() > Date.parse(manifest.nextRefreshAt) + 30 * 60_000;
 
@@ -16,6 +17,34 @@ export async function readSnapshotManifest(version?: string) {
   if (version && !/^[a-f0-9-]{36}$/.test(version)) throw new ServiceError('스냅샷 주소를 확인해 주세요.', 400);
   const row = await getDb().select({ data: state.data }).from(state).where(eq(state.id, version ?? 'active')).get();
   return row?.data ?? null;
+}
+
+/** Owner workflow only: the working manifest is never exposed by public version reads. */
+export async function readEditorialSnapshotManifest() {
+  const working = await getDb().select({ data: state.data }).from(state).where(eq(state.id, 'working')).get();
+  if (working && !working.data.publishedAt) {
+    if (!working.data.periods.daily || working.data.completed !== working.data.repositories.length) throw new Error('스냅샷 자료 수집을 먼저 완료하세요.');
+    return working.data;
+  }
+  return readSnapshotManifest();
+}
+
+export async function readSnapshotEvidence(version: string, repository: string) {
+  const row = await getDb().select({ evidence: items.evidence }).from(items).where(eq(items.id, itemId(version, repository))).get();
+  return row?.evidence ?? null;
+}
+
+async function missingBriefs(manifest: RepositorySnapshotManifest) {
+  const saved = manifest.repositories.length ? await getDb().select({ id: repositoryBriefs.id }).from(repositoryBriefs).where(inArray(repositoryBriefs.id, manifest.repositories)) : [];
+  const ids = new Set(saved.map(row => row.id));
+  return manifest.repositories.filter(id => !ids.has(id));
+}
+
+function overviewFromEvidence(evidence: BriefEvidence): RepositoryOverview {
+  return { id: evidence.id, description: evidence.description, language: evidence.language, stars: evidence.stars, license: evidence.license,
+    sha: '', fetchedAt: evidence.fetchedAt, readme: evidence.readme, readmePath: null, readmeSha: evidence.readmeSha,
+    paths: [], truncated: true, dependencies: {}, packageName: null,
+    warnings: [...evidence.warnings, '저장된 해설 자료를 재사용했습니다. 파일 구조와 기준 커밋은 수집되지 않았습니다.'] };
 }
 
 export async function readTrendingSnapshot(period: TrendingPeriod = 'daily', version?: string): Promise<TrendingSnapshot> {
@@ -55,13 +84,14 @@ export async function repositorySnapshotStatus() {
     stale: active ? delayed(active) : Date.now() > Date.parse(initialBaseline.nextRefreshAt) + 30 * 60_000,
     periods: snapshotPeriods.map(period => ({ period, repositories: (active?.periods ?? initialBaseline.periods)[period].repositories.length })),
     totalRepositories: active?.repositories.length ?? new Set(snapshotPeriods.flatMap(period => initialBaseline.periods[period].repositories.map(repo => repo.id.toLowerCase()))).size,
-    refresh: working ? { completed: working.data.completed, total: working.data.repositories.length, error: working.data.error ?? null, busy: working.leaseUntil > Date.now() } : null,
+    refresh: working ? { version: working.data.version, phase: working.data.publishedAt || working.data.version === active?.version ? 'published' : working.data.completed < working.data.repositories.length ? 'collecting' : 'editorial', completed: working.data.completed, total: working.data.repositories.length, dueRepositories: working.data.completed === working.data.repositories.length ? (await missingBriefs(working.data)).length : null, error: working.data.error ?? null, busy: working.leaseUntil > Date.now() } : null,
   };
 }
 
-function progress(manifest: RepositorySnapshotManifest, published: boolean) {
-  return { version: manifest.version, fetchedAt: manifest.fetchedAt, completed: manifest.completed, total: manifest.repositories.length, remaining: manifest.repositories.length - manifest.completed, published,
-    instructions: published ? '스냅샷을 공개했습니다. get_repository_snapshot_status로 저장 결과를 확인하고 종료하세요.' : '같은 refresh_repository_snapshot 도구를 빈 객체로 다시 호출하세요. published가 true일 때만 완료입니다. 오류나 busy 응답이면 이번 실행을 중단하고 보고하세요.' };
+function progress(manifest: RepositorySnapshotManifest, published: boolean, dueRepositories = 0) {
+  const phase = published ? 'published' : manifest.completed < manifest.repositories.length ? 'collecting' : 'editorial';
+  return { version: manifest.version, fetchedAt: manifest.fetchedAt, completed: manifest.completed, total: manifest.repositories.length, remaining: manifest.repositories.length - manifest.completed, published, phase, dueRepositories,
+    instructions: published ? '자료 수집과 신규 해설 작성을 모두 마친 스냅샷을 공개했습니다. get_repository_snapshot_status로 저장 결과를 확인하고 종료하세요.' : phase === 'editorial' ? '자료 수집을 마쳤으며 아직 공개하지 않았습니다. get_editorial_queue를 빈 객체로 호출해 신규 해설만 작성하고 publish_repository_brief로 저장하세요. dueRepositories가 0이면 refresh_repository_snapshot을 다시 호출해 전체 스냅샷을 공개하세요. 기존 자료와 해설은 재수집하거나 재작성하지 마세요.' : '같은 refresh_repository_snapshot 도구를 빈 객체로 다시 호출하세요. phase가 editorial이면 신규 해설 작성으로 이어가세요. 오류나 busy 응답이면 이번 실행을 중단하고 보고하세요.' };
 }
 
 /** Owner-only writer: one repository per call keeps HTTP execution bounded. */
@@ -82,7 +112,7 @@ export async function refreshRepositorySnapshot() {
   try {
     // A run may start just before a scheduled boundary. Keep its version and
     // cursor across that boundary; only abandon work more than one slot old.
-    const resumable = manifest.periods.daily && manifest.completed < manifest.repositories.length && slot - manifest.slot <= SNAPSHOT_INTERVAL_MS;
+    const resumable = manifest.periods.daily && !manifest.publishedAt && manifest.version !== active?.version && slot - manifest.slot <= SNAPSHOT_INTERVAL_MS;
     if ((manifest.slot !== slot && !resumable) || !manifest.periods.daily) {
       const snapshots = await Promise.all(snapshotPeriods.map(period => getTrending(period, true)));
       if (snapshots.some(snapshot => snapshot.stale || !snapshot.repositories.length)) throw new Error('최신 트렌딩 목록을 수집하지 못했습니다.');
@@ -90,13 +120,23 @@ export async function refreshRepositorySnapshot() {
       manifest = { ...placeholder, periods: Object.fromEntries(snapshotPeriods.map((period, i) => [period, snapshots[i]])) as RepositorySnapshotManifest['periods'], repositories };
       await db.update(state).set({ data: manifest, updatedAt: now() }).where(owned);
     }
-    const repository = manifest.repositories[manifest.completed];
-    if (repository) {
+    while (manifest.completed < manifest.repositories.length) {
+      const repository = manifest.repositories[manifest.completed];
       const snapshot = snapshotPeriods.map(period => manifest.periods[period]).find(period => period.repositories.some(repo => repo.id.toLowerCase() === repository))!;
       // Both collectors reject private repositories. Transient failures never publish partial data.
-      const previous = active ? await db.select().from(items).where(eq(items.id, itemId(active.version, repository))).get() : undefined;
-      const overview = await inspectRepository(repository, true, previous?.overview);
-      const evidence = await collectBriefEvidence(repository, snapshot, true, { overview, previous: previous?.evidence, previousCommitSha: previous?.overview.sha });
+      let material = await db.select().from(repositoryMaterials).where(eq(repositoryMaterials.id, repository)).get();
+      let fetched = false;
+      if (!material) {
+        // Older introductions may predate snapshots. Reuse their actual saved sources, too.
+        const saved = await db.select({ evidence: repositoryBriefs.evidence }).from(repositoryBriefs).where(eq(repositoryBriefs.id, repository)).get()
+          ?? await db.select({ evidence: editorialSources.evidence }).from(editorialSources).where(eq(editorialSources.id, repository)).get();
+        fetched = !saved;
+        const overview = saved ? overviewFromEvidence(saved.evidence) : await inspectRepository(repository, true);
+        const evidence = saved?.evidence ?? await collectBriefEvidence(repository, snapshot, true, { overview });
+        await db.insert(repositoryMaterials).values({ id: repository, overview, evidence, collectedAt: evidence.fetchedAt }).onConflictDoNothing();
+        material = (await db.select().from(repositoryMaterials).where(eq(repositoryMaterials.id, repository)).get())!;
+      }
+      const { overview, evidence } = material;
       const createdAt = now();
       // Save first: a crash before cursor advancement safely retries the same item.
       const [entry] = await db.insert(items).select(db.select({
@@ -109,18 +149,24 @@ export async function refreshRepositorySnapshot() {
       const [saved] = await db.update(state).set({ data: { ...manifest, completed: manifest.completed + 1, error: undefined }, updatedAt: createdAt }).where(and(owned, sql`${state.leaseUntil} > ${Date.now()}`)).returning({ id: state.id });
       if (!saved) throw new Error('수집 권한이 만료됐습니다. 이전 스냅샷을 유지합니다.');
       manifest = { ...manifest, completed: manifest.completed + 1, error: undefined };
+      // Copy all stored repositories in this call; bound external work to one new repository.
+      if (fetched) break;
     }
     if (manifest.completed < manifest.repositories.length) return progress(manifest, false);
     const [{ count }] = await db.select({ count: sql<number>`count(*)` }).from(items).where(eq(items.version, manifest.version));
     if (Number(count) !== manifest.repositories.length) throw new Error('스냅샷 자료가 불완전합니다. 이전 공개 버전을 유지합니다.');
+    const missing = await missingBriefs(manifest);
+    if (missing.length) return progress(manifest, false, missing.length);
     const completed = { ...manifest, publishedAt: now() };
     // Readers only follow active. All entries and the immutable manifest exist before it moves.
     const [, published] = await db.batch([
       db.insert(state).values({ id: completed.version, data: completed, updatedAt: now() }).onConflictDoNothing(),
       db.insert(state).select(db.select({ id: sql`'active'`.as('id'), data: sql`${JSON.stringify(completed)}`.as('data'), updatedAt: sql`${now()}`.as('updated_at'), leaseToken: sql`null`.as('lease_token'), leaseUntil: sql`0`.as('lease_until') }).from(state).where(and(owned, sql`${state.leaseUntil} > ${Date.now()}`)))
         .onConflictDoUpdate({ target: state.id, set: { data: completed, updatedAt: now() } }).returning({ id: state.id }),
+      db.update(state).set({ data: completed, updatedAt: now() }).where(and(owned, sql`${state.leaseUntil} > ${Date.now()}`)),
     ]);
     if (!published.length) throw new Error('수집 권한이 만료돼 공개 버전을 교체하지 않았습니다.');
+    manifest = completed;
     const cutoff = new Date(Date.now() - 2 * 86400000).toISOString();
     // Keep older generations briefly for browsers already displaying those lists.
     await db.delete(items).where(and(lt(items.createdAt, cutoff), ne(items.version, completed.version), active ? ne(items.version, active.version) : undefined));
